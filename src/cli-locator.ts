@@ -1,0 +1,46 @@
+import { existsSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { homedir } from "node:os";
+import * as path from "node:path";
+
+const IS_WIN = process.platform === "win32";
+
+function candidateNames(): string[] {
+  return IS_WIN ? ["grok.cmd", "grok.exe", "grok.bat", "grok"] : ["grok"];
+}
+
+function effectiveHome(): string {
+  // Respect env overrides first so tests + users can redirect the home lookup.
+  const fromEnv = IS_WIN ? process.env.USERPROFILE : process.env.HOME;
+  return fromEnv || homedir();
+}
+
+export function locateGrokCli(configuredPath: string): string | undefined {
+  if (configuredPath) {
+    return existsSync(configuredPath) ? configuredPath : undefined;
+  }
+  const homeBin = path.join(effectiveHome(), ".grok", "bin");
+  for (const name of candidateNames()) {
+    const candidate = path.join(homeBin, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  try {
+    const cmd = IS_WIN ? "where grok" : "command -v grok";
+    const out = execSync(cmd, { encoding: "utf8" }).trim();
+    const first = out.split(/\r?\n/)[0]?.trim();
+    if (first && existsSync(first)) return first;
+  } catch {
+    // ignore — not on PATH
+  }
+  return undefined;
+}
+
+/**
+ * Decide whether to silently auto-update the grok CLI because *our extension* was
+ * upgraded since the last run. True only when a prior version was recorded (so a
+ * fresh install never triggers an update — that's the "not-first-run" rule) and it
+ * differs from the current extension version. Pure so it's unit-testable.
+ */
+export function extensionWasUpgraded(lastSeen: string | undefined, current: string): boolean {
+  return !!lastSeen && !!current && lastSeen !== current;
+}

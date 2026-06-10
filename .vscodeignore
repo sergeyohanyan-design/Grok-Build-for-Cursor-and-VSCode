@@ -1,0 +1,24 @@
+.vscode/**
+.gitignore
+.env
+.claude/**
+research/**
+test/**
+src/**
+tsconfig.json
+node_modules/**
+!node_modules/ws/**
+.git/**
+Screenshot*.png
+public/**
+CLAUDE.md
+AGENTS.md
+TESTS.md
+**/*.map
+**/*.ts
+!out/**/*.js
+
+# Local dev / MCP / agent state — never ship in the extension
+mcps/**
+.grok/**
+**/.grok/**
