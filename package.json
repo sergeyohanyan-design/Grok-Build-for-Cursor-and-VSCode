@@ -1,6 +1,6 @@
 {
   "name": "grok-build-gui",
-  "displayName": "Grok Build",
+  "displayName": "Grok Build - XAI",
   "description": "Grok Build - XAI for VS Code: professional AI agent sidebar powered by xAI Grok. Plan, build, and ship with autonomous workflows, edit approvals, context attachments, model selection, voice input, and inline generative media over the Agent Client Protocol.",
   "version": "1.0.0",
   "publisher": "sahilrakhaiya",
@@ -20,9 +20,7 @@
     "vscode": "^1.94.0"
   },
   "categories": [
-    "AI",
-    "Developer Tools",
-    "Chat"
+    "Other"
   ],
   "keywords": [
     "grok",
@@ -127,10 +125,6 @@
       {
         "command": "grok.logout",
         "title": "Grok: Log Out"
-      },
-      {
-        "command": "grok._debugDummyPlan",
-        "title": "Grok: Debug - Show dummy plan card (for testing Approve/Reject/Cancel)"
       }
     ],
     "keybindings": [

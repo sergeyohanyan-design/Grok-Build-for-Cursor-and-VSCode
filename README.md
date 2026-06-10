@@ -1,4 +1,4 @@
-# Grok Build
+# Grok Build - XAI
 
 <p align="center">
   <img src="resources/grok-icon.png" width="80" height="80" alt="Grok Build - XAI" />
