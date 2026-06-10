@@ -21,7 +21,7 @@ find_code_cli() {
 }
 
 code=$(find_code_cli)
-for id in sahilrakhaiya05.grok-build-gui grok-gui.grok-build-gui grok-gui.grok-vscode-gui; do
+for id in sahilrakhaiya.grok-build-gui sahilrakhaiya05.grok-build-gui grok-gui.grok-build-gui grok-gui.grok-vscode-gui; do
   echo "Uninstalling $id via $code"
   "$code" --uninstall-extension "$id" 2>/dev/null || true
 done

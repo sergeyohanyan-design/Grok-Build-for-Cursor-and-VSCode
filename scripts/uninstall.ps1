@@ -16,7 +16,7 @@ function Find-CodeCli {
 }
 
 $code = Find-CodeCli
-foreach ($id in @("sahilrakhaiya05.grok-build-gui", "grok-gui.grok-build-gui", "grok-gui.grok-vscode-gui")) {
+foreach ($id in @("sahilrakhaiya.grok-build-gui", "sahilrakhaiya05.grok-build-gui", "grok-gui.grok-build-gui", "grok-gui.grok-vscode-gui")) {
   Write-Host "Uninstalling $id via $code"
   & $code --uninstall-extension $id 2>$null
 }

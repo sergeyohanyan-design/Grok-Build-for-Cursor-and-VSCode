@@ -14,6 +14,9 @@ public/**
 CLAUDE.md
 AGENTS.md
 TESTS.md
+docs/**
+scripts/**
+.github/**
 **/*.map
 **/*.ts
 !out/**/*.js
