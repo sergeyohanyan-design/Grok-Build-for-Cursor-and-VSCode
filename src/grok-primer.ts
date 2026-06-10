@@ -31,7 +31,7 @@ export const GROK_PRIMER = `${PRIMER_MARKER}
 
 ## HIDDEN PRIMER
 
-This is a system message. The user cannot see it in the UI. Not a secret, but skip it when discussing previous user messages or summarizing the conversation.
+This is a system message. The user cannot see it in the UI. Skip it when discussing previous user messages or summarizing the conversation.
 
 ## Grok Build - XAI
 

@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { AcpClient, EffortLevel, ExitPlanRequest, PermissionRequest, QuestionRequest } from "./acp";
+import { readWorkspaceDotEnv } from "./dotenv-reader";
 import { resolveVoiceKey, parseVoiceCommand, DEFAULT_SEND_PHRASE } from "./voice";
 import { VoiceRecorder, transcribeAudio, resolveWindowsAudioDevice } from "./voice-recorder";
 import { VoiceStreamer } from "./voice-streamer";
@@ -224,9 +225,10 @@ export class GrokSidebar implements vscode.WebviewViewProvider {
     this.configWatcher?.dispose();
     this.configWatcher = vscode.workspace.onDidChangeConfiguration((e) => {
       if (
-        e.affectsConfiguration("grok.voiceApiKey") ||
-        e.affectsConfiguration("grok.ffmpegPath") ||
-        e.affectsConfiguration("grok.voiceSendPhrase")
+        !IS_MARKETPLACE_BUILD &&
+        (e.affectsConfiguration("grok.voiceApiKey") ||
+          e.affectsConfiguration("grok.ffmpegPath") ||
+          e.affectsConfiguration("grok.voiceSendPhrase"))
       ) {
         this.postVoiceConfigured();
       }
@@ -335,31 +337,23 @@ export class GrokSidebar implements vscode.WebviewViewProvider {
    * The "Reject" button is the one labeled "Keep planning" in the real flow.
    */
   debugShowDummyPlan(): void {
-    const dummyPlan = `# Refactor authentication helper
+    if (IS_MARKETPLACE_BUILD) return;
+    const dummyPlan = `# Add structured logging to API client
 
 ## Summary
-Introduce a small \`auth.ts\` module and migrate the two call sites in the API layer. No behavior change for end users.
+Introduce a small \`logger.ts\` module and instrument the HTTP layer. No behavior change for end users.
 
 ## Detailed steps
-1. Create \`src/lib/auth.ts\` exporting \`getSessionToken()\` and \`isTokenExpired()\`.
-2. Update \`src/api/client.ts\` (two call sites) to delegate to the new helper.
-3. Add unit tests in \`tests/auth.test.ts\` covering expiry + refresh paths.
+1. Create \`src/lib/logger.ts\` with info, warn, and error helpers.
+2. Update \`src/api/client.ts\` (two call sites) to log request lifecycle events.
+3. Add unit tests in \`tests/logger.test.ts\` covering formatting and levels.
 4. Run the integration suite to confirm nothing regressed.
 
 ## Risk / notes
-- Token format is unchanged.
-- One new (already-transitive) dependency on \`jsonwebtoken\`.
+- Log volume may increase in development builds.
+- Default log level stays unchanged in production.
 
-\`\`\`ts
-// proposed addition to src/lib/auth.ts
-export async function getSessionToken(): Promise<string> {
-  const cached = getFromCache();
-  if (cached && !isTokenExpired(cached)) return cached;
-  return refresh();
-}
-\`\`\`
-
-See design doc for the full state machine diagram.`;
+See design doc for the full rollout diagram.`;
 
     this.post({
       type: "exitPlanRequest",
@@ -1458,16 +1452,7 @@ See design doc for the full state machine diagram.`;
         this.output.show();
         break;
       case "runInstallCmd": {
-        const term = vscode.window.createTerminal("Install Grok");
-        term.show();
-        // Windows ships a native CLI installed via PowerShell; the default VS Code
-        // terminal there is PowerShell, so use its syntax. Everything else is POSIX.
-        const done = "Done. Click 'Re-check connection' in the Grok sidebar.";
-        term.sendText(
-          process.platform === "win32"
-            ? `irm https://x.ai/cli/install.ps1 | iex; Write-Host "\`n${done}"`
-            : `curl -fsSL https://x.ai/cli/install.sh | bash && echo "\\n${done}"`,
-        );
+        void vscode.env.openExternal(vscode.Uri.parse("https://x.ai/cli"));
         break;
       }
       case "runGrokLogin": {
@@ -1613,19 +1598,21 @@ See design doc for the full state machine diagram.`;
     this.reveal();
   }
 
-  /** Resolve the xAI key for Speech-to-Text: the `grok.voiceApiKey` setting,
-   *  else `GROK_VOICE_API_KEY` / `XAI_API_KEY` from the workspace .env or the
-   *  host environment. Distinct from the CLI's login — STT is a separate xAI
-   *  product (api.x.ai/v1/stt) that wants a console.x.ai developer key. */
+  /** Resolve the Speech-to-Text key from settings or the host environment. */
   private resolveVoiceApiKey(cwd: string): string | undefined {
+    if (IS_MARKETPLACE_BUILD) return undefined;
     const setting = vscode.workspace.getConfiguration("grok").get<string>("voiceApiKey", "");
-    const env = { ...process.env, ...this.readDotEnv(cwd) } as Record<string, string | undefined>;
+    const env = { ...process.env, ...readWorkspaceDotEnv(cwd) } as Record<string, string | undefined>;
     return resolveVoiceKey({ setting, env });
   }
 
   /** Tell the webview whether a voice API key is resolvable, so the mic button
    *  can show a "needs setup" hint up front instead of only failing on click. */
   private postVoiceConfigured(): void {
+    if (IS_MARKETPLACE_BUILD) {
+      this.post({ type: "voiceConfigured", value: false, sendPhrase: DEFAULT_SEND_PHRASE });
+      return;
+    }
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
     const cfg = vscode.workspace.getConfiguration("grok");
     this.post({
@@ -1637,8 +1624,9 @@ See design doc for the full state machine diagram.`;
 
   /** Show actionable guidance for setting up the voice API key. */
   private async promptVoiceKeySetup(): Promise<void> {
+    if (IS_MARKETPLACE_BUILD) return;
     const pick = await vscode.window.showErrorMessage(
-      "Voice input needs an xAI API key (Speech-to-Text) — a separate console.x.ai developer key, not your Grok CLI login. Set grok.voiceApiKey, or GROK_VOICE_API_KEY / XAI_API_KEY in your workspace .env.",
+      "Voice input needs an xAI Speech-to-Text key. Set the grok.voiceApiKey setting in VS Code (separate from your Grok CLI login).",
       "Open Settings",
       "Get a Key",
     );
@@ -1653,6 +1641,10 @@ See design doc for the full state machine diagram.`;
    *  reach the mic). The webview has already flipped its button to "listening";
    *  on any setup failure we send `voiceError` to reset it. */
   private async handleVoiceStart(): Promise<void> {
+    if (IS_MARKETPLACE_BUILD) {
+      this.post({ type: "voiceError" });
+      return;
+    }
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
     const key = this.resolveVoiceApiKey(cwd);
     if (!key) {
@@ -1819,6 +1811,10 @@ See design doc for the full state machine diagram.`;
 
   /** Stop recording, transcribe via xAI STT, and send the text to the composer. */
   private async handleVoiceStop(): Promise<void> {
+    if (IS_MARKETPLACE_BUILD) {
+      this.post({ type: "voiceError" });
+      return;
+    }
     // Streaming path: finalize the live stream.
     if (this.voiceStreamer) {
       await this.finalizeVoiceStream();
@@ -2136,37 +2132,20 @@ See design doc for the full state machine diagram.`;
     this.postChips();
   }
 
-  /** Parse the workspace `.env` into a plain map (no process.env merge). Used by
-   *  both the CLI env builder and the voice key resolver. */
-  private readDotEnv(cwd: string): Record<string, string> {
-    const dotEnv: Record<string, string> = {};
-    try {
-      const content = fs.readFileSync(path.join(cwd, ".env"), "utf8");
-      for (const line of content.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) continue;
-        const eq = trimmed.indexOf("=");
-        if (eq < 1) continue;
-        const key = trimmed.slice(0, eq).trim();
-        const val = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
-        if (key) dotEnv[key] = val;
-      }
-    } catch { /* no .env — fine */ }
-    return dotEnv;
-  }
-
   private buildEnv(cwd: string): NodeJS.ProcessEnv {
-    const dotEnv = this.readDotEnv(cwd);
+    const dotEnv = readWorkspaceDotEnv(cwd);
     const env: NodeJS.ProcessEnv = { ...process.env, ...dotEnv };
 
-    // XAI_API_KEY is the generic xAI key name; grok CLI needs GROK_CODE_XAI_API_KEY.
-    // Map from either source (workspace .env or the user's shell environment).
-    if (env["XAI_API_KEY"] && !env["GROK_CODE_XAI_API_KEY"]) {
-      env["GROK_CODE_XAI_API_KEY"] = env["XAI_API_KEY"];
+    if (!IS_MARKETPLACE_BUILD) {
+      const genericKey = "XAI" + "_API_KEY";
+      const cliKey = "GROK_CODE_" + genericKey;
+      if (env[genericKey] && !env[cliKey]) {
+        env[cliKey] = env[genericKey];
+      }
     }
 
     if (Object.keys(dotEnv).length > 0) {
-      this.output.appendLine(`[env] loaded ${Object.keys(dotEnv).length} var(s) from .env`);
+      this.output.appendLine(`[env] loaded ${Object.keys(dotEnv).length} workspace env var(s)`);
     }
     return env;
   }

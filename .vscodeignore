@@ -7,7 +7,7 @@ test/**
 src/**
 tsconfig.json
 node_modules/**
-!node_modules/ws/**
+out/**
 .git/**
 Screenshot*.png
 public/**
@@ -19,9 +19,12 @@ scripts/**
 .github/**
 **/*.map
 **/*.ts
-!out/**/*.js
 
 # Local dev / MCP / agent state — never ship in the extension
 mcps/**
 .grok/**
 **/.grok/**
+agent-tools/**
+README.marketplace.md
+CHANGELOG.marketplace.md
+.marketplace-backup.json

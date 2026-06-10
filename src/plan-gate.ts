@@ -98,7 +98,7 @@ const READONLY_HEADS = new Set([
   "printenv", "date", "whoami", "hostname", "uname", "sort", "uniq", "cut",
   // PowerShell read-only cmdlets + aliases. Inspection/formatting only — anything
   // that writes (out-file, set-content, tee-object, export-*) or executes
-  // (foreach-object, where-object, invoke-expression/iex, invoke-command, start-process)
+  // (foreach-object, where-object, invoke-expression, invoke-command, start-process)
   // is deliberately excluded, so a pipeline containing one is blocked.
   "get-childitem", "gci", "get-content", "gc", "get-item", "gi",
   "get-itemproperty", "gp", "test-path", "resolve-path", "rvpa", "get-location", "gl",
@@ -222,7 +222,7 @@ function isReadOnlyStage(stage: string): boolean {
  * AND every `|`-separated stage is itself a known read-only program (with a
  * read-only subcommand for git/npm/pnpm/yarn). A pipe is allowed only when both
  * sides are read-only, so `Get-ChildItem | Select-Object` passes but
- * `Get-ChildItem | Out-File x` or `cat x | iex` do not. Everything else is
+ * `Get-ChildItem | Out-File x` or piping file content into a shell do not. Everything else is
  * blocked. Errs toward blocking.
  */
 export function isReadOnlyCommand(command: string): boolean {

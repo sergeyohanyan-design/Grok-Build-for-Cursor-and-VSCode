@@ -69,8 +69,13 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("grok.showLogs", () => output.show()),
     vscode.commands.registerCommand("grok.logout", () => sidebar.logout()),
-    vscode.commands.registerCommand("grok._debugDummyPlan", () => sidebar.debugShowDummyPlan()),
   );
+
+  if (!IS_MARKETPLACE_BUILD) {
+    context.subscriptions.push(
+      vscode.commands.registerCommand("grok._debugDummyPlan", () => sidebar.debugShowDummyPlan()),
+    );
+  }
 
   // Start grok as soon as the extension loads — don't wait for the webview "ready"
   // message (which can be lost on reload races and leaves the UI stuck on Connecting).

@@ -1,8 +1,8 @@
 {
   "name": "grok-build-gui",
-  "displayName": "Grok Build - XAI",
-  "description": "Grok Build - XAI for VS Code: professional AI agent sidebar powered by xAI Grok. Plan, build, and ship with autonomous workflows, edit approvals, context attachments, model selection, voice input, and inline generative media over the Agent Client Protocol.",
-  "version": "1.0.0",
+  "displayName": "Grok Build GUI",
+  "description": "Grok Build GUI for VS Code: professional AI agent sidebar powered by xAI Grok. Plan, build, and ship with autonomous workflows, edit approvals, context attachments, model selection, voice input, and inline generative media over the Agent Client Protocol.",
+  "version": "1.0.4",
   "publisher": "sahilrakhaiya",
   "author": {
     "name": "Sahil Rakhaiya"
@@ -23,23 +23,13 @@
     "Other"
   ],
   "keywords": [
-    "grok",
-    "grok-build",
-    "xai",
-    "xai-grok",
-    "acp",
-    "acp-client",
-    "agent-client-protocol",
     "agent",
-    "ai",
-    "thinking",
-    "tool-calls",
-    "plan-mode",
-    "sidebar-chat",
-    "developer-tools"
+    "sidebar",
+    "developer-tools",
+    "acp"
   ],
   "icon": "resources/grok-icon.png",
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "activationEvents": [
     "onView:grok.chat",
     "onCommand:grok.open",
@@ -50,14 +40,14 @@
       "activitybar": [
         {
           "id": "grokSidebar",
-          "title": "Grok Build - XAI",
+          "title": "Grok Build GUI",
           "icon": "resources/grok-icon.svg"
         }
       ],
       "secondarySideBar": [
         {
           "id": "grokSidebar",
-          "title": "Grok Build - XAI",
+          "title": "Grok Build GUI",
           "icon": "resources/grok-icon.svg"
         }
       ]
@@ -67,14 +57,14 @@
         {
           "type": "webview",
           "id": "grok.chat",
-          "name": "Grok Build - XAI"
+          "name": "Grok Build GUI"
         }
       ]
     },
     "commands": [
       {
         "command": "grok.open",
-        "title": "Open Grok Build - XAI",
+        "title": "Open Grok Build GUI",
         "icon": {
           "light": "resources/grok-icon-dark.svg",
           "dark": "resources/grok-icon-light.svg"
@@ -229,44 +219,22 @@
           "type": "boolean",
           "default": false,
           "description": "Silently run grok update when the extension version changes. Disabled by default to avoid slow startups."
-        },
-        "grok.voiceApiKey": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "xAI API key for voice input (Speech-to-Text via `api.x.ai/v1/stt`). This is a **separate** developer key from [console.x.ai](https://console.x.ai) — it is billed pay-as-you-go and is unrelated to the Grok CLI login. Leave empty to fall back to `GROK_VOICE_API_KEY` or `XAI_API_KEY` in your workspace `.env`."
-        },
-        "grok.ffmpegPath": {
-          "type": "string",
-          "default": "",
-          "description": "Path to the ffmpeg binary used to record the microphone for voice input. Empty = use 'ffmpeg' from PATH. Install ffmpeg from https://ffmpeg.org if voice input reports it as missing."
-        },
-        "grok.voiceInputDevice": {
-          "type": "string",
-          "default": "",
-          "description": "Microphone device for voice input. Empty = system default (on Windows, the first DirectShow audio device is auto-detected). Set this to a specific device name (Windows/dshow) or index (macOS/avfoundation) to override."
-        },
-        "grok.voiceSendPhrase": {
-          "type": "string",
-          "default": "grok send",
-          "description": "Spoken phrase that auto-submits the message when it ends a voice transcription (e.g. say \"…fix the bug, grok send\"). The phrase is stripped before sending. Leave empty to disable hands-free sending."
-        },
-        "grok.voiceStreaming": {
-          "type": "boolean",
-          "default": true,
-          "description": "Stream voice transcription live as you speak (words appear in the composer in real time, and \"grok send\" can submit without a second click). Disable to use one-shot batch mode (click to start, click to stop, then transcribe). Streaming costs $0.20/hr of audio vs $0.10/hr batch."
         }
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "tsc -p .",
+    "vscode:prepublish": "node scripts/bundle.cjs",
+    "bundle": "node scripts/bundle.cjs",
+    "bundle:dev": "node -e \"process.env.MARKETPLACE_BUNDLE='0'; require('./scripts/bundle.cjs')\"",
     "compile": "tsc -p .",
     "watch": "tsc -p . -w",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:live": "tsc -p . && node scripts/live-tests.cjs",
-    "prepackage": "node -e \"for (const f of require('fs').readdirSync('.')) if (f.endsWith('.vsix')) require('fs').unlinkSync(f)\"",
-    "package": "npx @vscode/vsce package",
+    "prepackage": "node -e \"for (const f of require('fs').readdirSync('.')) if (f.endsWith('.vsix')) require('fs').unlinkSync(f)\" && node scripts/prepare-marketplace-package.cjs && node scripts/check-marketplace-readme.cjs",
+    "postpackage": "node scripts/restore-marketplace-package.cjs",
+    "package": "node scripts/package-vsix.cjs",
     "publish": "npx @vscode/vsce publish"
   },
   "devDependencies": {
@@ -274,10 +242,9 @@
     "@types/vscode": "^1.94.0",
     "@types/ws": "^8.18.1",
     "happy-dom": "^20.9.0",
+    "esbuild": "^0.25.0",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
   },
-  "dependencies": {
-    "ws": "^8.21.0"
-  }
+  "dependencies": {}
 }

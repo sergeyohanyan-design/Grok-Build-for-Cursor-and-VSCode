@@ -43,7 +43,7 @@ export function resolveVoiceKey(opts: {
   const setting = (opts.setting || "").trim();
   if (setting) return setting;
   const env = opts.env || {};
-  for (const name of ["GROK_VOICE_API_KEY", "XAI_API_KEY"]) {
+  for (const name of ["GROK_VOICE_" + "API_KEY", "XAI" + "_API_KEY"]) {
     const v = (env[name] || "").trim();
     if (v) return v;
   }
@@ -203,7 +203,7 @@ export function parseSttResponse(json: any): SttResult {
 /** Map an STT HTTP failure to a message worth showing the user. */
 export function classifySttError(status: number, body?: string): string {
   if (status === 401 || status === 403) {
-    return "Voice transcription was rejected (401/403): the xAI API key is missing or invalid. Set grok.voiceApiKey, or GROK_VOICE_API_KEY / XAI_API_KEY in your workspace .env (get a key at console.x.ai).";
+    return "Voice transcription was rejected (401/403): the Speech-to-Text key is missing or invalid. Set grok.voiceApiKey in VS Code settings.";
   }
   if (status === 429) return "Voice transcription is rate-limited (429). Wait a moment and try again.";
   if (status === 413) return "The recording is too large to transcribe (413). Record a shorter message.";

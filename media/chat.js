@@ -1263,17 +1263,11 @@
     if (!onb) return;
     if (mode === "missing-cli") {
       if (ver) { ver.classList.remove("loading-dots"); ver.textContent = "CLI not installed"; }
-      const installCmd = info.platform === "win32"
-        ? "irm https://x.ai/cli/install.ps1 | iex"
-        : "curl -fsSL https://x.ai/cli/install.sh | bash";
       onb.innerHTML =
         `<div class="onb">` +
           `<p class="onb-heading">Install the Grok CLI</p>` +
-          `<div class="onb-cmd">` +
-            `<code>${installCmd}</code>` +
-            `<button class="onb-copy" type="button" title="Copy" data-cmd="${installCmd}">${ICON.copy}</button>` +
-          `</div>` +
-          `<button class="onb-action" type="button" data-act="runInstall">Open terminal &amp; run</button>` +
+          `<p class="onb-desc">Download and install the Grok CLI from the official xAI site, then return here and re-check the connection.</p>` +
+          `<button class="onb-action" type="button" data-act="runInstall">Open install page</button>` +
           `<button class="onb-action onb-secondary" type="button" data-act="recheck">Re-check connection</button>` +
         `</div>`;
     } else if (mode === "auth-required") {
@@ -1283,12 +1277,6 @@
           `<p class="onb-heading">Sign in to continue</p>` +
           `<p class="onb-desc"><strong>SuperGrok Heavy subscription</strong> &mdash; required for the <em>Grok Build</em> entitlement.</p>` +
           `<button class="onb-action" type="button" data-act="runLogin">Open terminal &amp; run <code>grok /login</code></button>` +
-          `<p class="onb-or">or</p>` +
-          `<p class="onb-desc"><strong>API key</strong> &mdash; pay per token; unlocks additional models (grok-4.20, grok-4.3, grok-imagine). Get a key at <a href="https://console.x.ai" class="onb-link">console.x.ai</a>, then add to your shell or a workspace <code>.env</code>:</p>` +
-          `<div class="onb-cmd">` +
-            `<code>XAI_API_KEY=your-key-here</code>` +
-            `<button class="onb-copy" type="button" title="Copy" data-cmd="XAI_API_KEY=">${ICON.copy}</button>` +
-          `</div>` +
           `<button class="onb-action onb-secondary" type="button" data-act="recheck">Re-check connection</button>` +
         `</div>`;
     } else {
