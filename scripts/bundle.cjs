@@ -3,7 +3,8 @@ const esbuild = require("esbuild");
 const path = require("path");
 const fs = require("fs");
 
-const marketplace = process.env.MARKETPLACE_BUNDLE !== "0";
+// This fork ships the full voice/attach host. Marketplace stubs are opt-in.
+const marketplace = process.env.MARKETPLACE_BUNDLE === "1";
 const stubDir = path.join(__dirname, "..", "src", "marketplace-stubs");
 
 fs.mkdirSync("dist", { recursive: true });

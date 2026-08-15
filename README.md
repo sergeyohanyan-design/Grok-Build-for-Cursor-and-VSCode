@@ -43,15 +43,24 @@ Added in this fork:
 - Windows file-picker and path-normalization fixes
 - Tool-round scroll that keeps the latest agent work on screen
 
-## Install from source
+## Install
 
 Do **not** expect these patches from the Marketplace listing.
+
+### From a GitHub Release (VSIX)
+
+1. Download `grok-build-gui-1.0.5.vsix` from [Releases](https://github.com/sergeyohanyan-design/Grok-Build-GUI/releases).
+2. In VS Code or Cursor: **Extensions → … → Install from VSIX…**
+3. Reload the window.
+
+This fork’s VSIX is a **full build** (voice included). Version **1.0.5** is the first enhanced release on top of upstream 1.0.4.
+
+### From source
 
 ```bat
 git clone https://github.com/sergeyohanyan-design/Grok-Build-GUI.git
 cd Grok-Build-GUI
 npm.cmd install
-set MARKETPLACE_BUNDLE=0
 npm.cmd run bundle:dev
 ```
 
@@ -104,11 +113,11 @@ Soft caps: about 12 MB per vision encode, about 25 MB per temp attach.
 
 ```bat
 npm.cmd test
-set MARKETPLACE_BUNDLE=0
 npm.cmd run bundle:dev
+npm.cmd run package:fork
 ```
 
-Always build with `MARKETPLACE_BUNDLE=0`. A Marketplace bundle will stub voice again.
+This fork defaults to a **full** host bundle. Set `MARKETPLACE_BUNDLE=1` only if you intentionally want the stubbed Marketplace scanner build.
 
 ## Support
 

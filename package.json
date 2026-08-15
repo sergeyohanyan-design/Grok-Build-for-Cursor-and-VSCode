@@ -327,6 +327,7 @@
   },
   "scripts": {
     "vscode:prepublish": "node scripts/bundle.cjs",
+    "package:fork": "node scripts/package-fork-vsix.cjs",
     "bundle": "node scripts/bundle.cjs",
     "bundle:dev": "node -e \"process.env.MARKETPLACE_BUNDLE='0'; require('./scripts/bundle.cjs')\"",
     "compile": "tsc -p .",

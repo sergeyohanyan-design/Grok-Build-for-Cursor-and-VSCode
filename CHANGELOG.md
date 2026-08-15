@@ -15,7 +15,11 @@
 
 ### Docs
 
-- README rewritten for this fork (install from source, voice, attach/vision, clipboard)
+- README rewritten for this fork (VSIX install, voice, attach/vision, clipboard)
+
+### Packaging
+
+- Full-build VSIX via `npm run package:fork` (Marketplace stubs are opt-in with `MARKETPLACE_BUNDLE=1`)
 
 ## 1.0.4 — 2026-06-10
 
