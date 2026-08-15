@@ -1,20 +1,20 @@
 {
   "name": "grok-build-gui",
   "displayName": "Grok Build GUI",
-  "description": "Grok Build GUI for VS Code: professional AI agent sidebar powered by xAI Grok. Plan, build, and ship with autonomous workflows, edit approvals, context attachments, model selection, voice input, and inline generative media over the Agent Client Protocol.",
-  "version": "1.0.4",
+  "description": "Enhanced Grok Build GUI: VS Code sidebar for the Grok CLI (ACP) with working Windows System.Speech voice, chat copy/paste/undo, screenshot vision, and Windows file-attach fixes. Not affiliated with xAI.",
+  "version": "1.0.5",
   "publisher": "sahilrakhaiya",
   "author": {
     "name": "Sahil Rakhaiya"
   },
   "license": "MIT",
-  "homepage": "https://github.com/SahilRakhaiya05/Grok-Build-GUI",
+  "homepage": "https://github.com/sergeyohanyan-design/Grok-Build-GUI",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SahilRakhaiya05/Grok-Build-GUI.git"
+    "url": "https://github.com/sergeyohanyan-design/Grok-Build-GUI.git"
   },
   "bugs": {
-    "url": "https://github.com/SahilRakhaiya05/Grok-Build-GUI/issues"
+    "url": "https://github.com/sergeyohanyan-design/Grok-Build-GUI/issues"
   },
   "engines": {
     "vscode": "^1.94.0"
@@ -115,6 +115,30 @@
       {
         "command": "grok.logout",
         "title": "Grok: Log Out"
+      },
+      {
+        "command": "grok.chatCopy",
+        "title": "Grok: Copy (Chat)"
+      },
+      {
+        "command": "grok.chatPaste",
+        "title": "Grok: Paste (Chat)"
+      },
+      {
+        "command": "grok.chatCut",
+        "title": "Grok: Cut (Chat)"
+      },
+      {
+        "command": "grok.chatSelectAll",
+        "title": "Grok: Select All (Chat)"
+      },
+      {
+        "command": "grok.chatUndo",
+        "title": "Grok: Undo (Chat)"
+      },
+      {
+        "command": "grok.chatRedo",
+        "title": "Grok: Redo (Chat)"
       }
     ],
     "keybindings": [
@@ -127,6 +151,48 @@
         "command": "grok.insertAtMention",
         "key": "alt+g",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "grok.chatCopy",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "focusedView == 'grok.chat' || grok.chatFocus"
+      },
+      {
+        "command": "grok.chatPaste",
+        "key": "ctrl+v",
+        "mac": "cmd+v",
+        "when": "focusedView == 'grok.chat' || grok.chatFocus"
+      },
+      {
+        "command": "grok.chatCut",
+        "key": "ctrl+x",
+        "mac": "cmd+x",
+        "when": "focusedView == 'grok.chat' || grok.chatFocus"
+      },
+      {
+        "command": "grok.chatSelectAll",
+        "key": "ctrl+a",
+        "mac": "cmd+a",
+        "when": "focusedView == 'grok.chat' || grok.chatFocus"
+      },
+      {
+        "command": "grok.chatUndo",
+        "key": "ctrl+z",
+        "mac": "cmd+z",
+        "when": "focusedView == 'grok.chat' || grok.chatFocus"
+      },
+      {
+        "command": "grok.chatRedo",
+        "key": "ctrl+y",
+        "mac": "cmd+shift+z",
+        "when": "focusedView == 'grok.chat' || grok.chatFocus"
+      },
+      {
+        "command": "grok.chatRedo",
+        "key": "ctrl+shift+z",
+        "mac": "cmd+shift+z",
+        "when": "focusedView == 'grok.chat' || grok.chatFocus"
       }
     ],
     "menus": {
@@ -219,6 +285,42 @@
           "type": "boolean",
           "default": false,
           "description": "Silently run grok update when the extension version changes. Disabled by default to avoid slow startups."
+        },
+        "grok.voiceEngine": {
+          "type": "string",
+          "enum": ["auto", "windows", "xai"],
+          "default": "auto",
+          "description": "Voice STT backend. auto = Windows System.Speech on Windows (no API key/ffmpeg), otherwise xAI cloud STT. windows = force System.Speech. xai = force xAI STT + ffmpeg."
+        },
+        "grok.voiceTts": {
+          "type": "boolean",
+          "default": true,
+          "description": "After a voice-submitted message, speak the agent reply with Windows SAPI TTS (Windows only)."
+        },
+        "grok.voiceApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "xAI API key for Speech-to-Text voice input (console.x.ai). Only needed when grok.voiceEngine is xai (or auto on non-Windows). Falls back to GROK_VOICE_API_KEY or XAI_API_KEY env vars."
+        },
+        "grok.ffmpegPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the ffmpeg binary used for microphone capture (xAI STT engine only). Empty = 'ffmpeg' on PATH."
+        },
+        "grok.voiceInputDevice": {
+          "type": "string",
+          "default": "",
+          "description": "Microphone device name for xAI/ffmpeg capture. On Windows this must be a DirectShow audio device name (dshow has no 'default'). Empty = auto-pick first device. Unused for Windows System.Speech (uses default mic)."
+        },
+        "grok.voiceSendPhrase": {
+          "type": "string",
+          "default": "grok send",
+          "description": "Trailing voice phrase that submits the composer (hands-free). Empty disables. Default: 'grok send'."
+        },
+        "grok.voiceStreaming": {
+          "type": "boolean",
+          "default": true,
+          "description": "xAI engine only: use realtime WebSocket STT (live partials + hands-free 'grok send'). When false, record then batch-transcribe on mic stop. Windows engine always streams partials."
         }
       }
     }
@@ -241,10 +343,12 @@
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.94.0",
     "@types/ws": "^8.18.1",
-    "happy-dom": "^20.9.0",
     "esbuild": "^0.25.0",
+    "happy-dom": "^20.9.0",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
 }

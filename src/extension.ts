@@ -69,6 +69,13 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("grok.showLogs", () => output.show()),
     vscode.commands.registerCommand("grok.logout", () => sidebar.logout()),
+    // Edit shortcuts while Grok chat has focus (workbench steals Ctrl/Cmd+C/V/X/A/Z).
+    vscode.commands.registerCommand("grok.chatCopy", () => sidebar.dispatchModKey("c")),
+    vscode.commands.registerCommand("grok.chatPaste", () => sidebar.dispatchModKey("v")),
+    vscode.commands.registerCommand("grok.chatCut", () => sidebar.dispatchModKey("x")),
+    vscode.commands.registerCommand("grok.chatSelectAll", () => sidebar.dispatchModKey("a")),
+    vscode.commands.registerCommand("grok.chatUndo", () => sidebar.dispatchModKey("z")),
+    vscode.commands.registerCommand("grok.chatRedo", () => sidebar.dispatchModKey("y")),
   );
 
   if (!IS_MARKETPLACE_BUILD) {

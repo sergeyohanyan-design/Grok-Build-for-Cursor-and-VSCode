@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.5 — 2026-08-16
+
+> Enhanced fork ([sergeyohanyan-design/Grok-Build-GUI](https://github.com/sergeyohanyan-design/Grok-Build-GUI)) of upstream 1.0.4. Marketplace builds still stub voice; this tag is the full local build.
+
+### Added
+
+- Windows `System.Speech` STT (sync `Recognize()` + stop-file) and optional SAPI TTS after voice-submitted turns
+- `grok.voiceEngine` (`auto` / `windows` / `xai`) plus send-phrase, TTS, and xAI fallback settings
+- Chat clipboard + undo: webview `e.code` handlers, host `vscode.env.clipboard` bridge, and `focusedView == grok.chat || grok.chatFocus` keybindings
+- ACP screenshot / image vision (`image` content blocks), clipboard image paste, and path-less drag-drop
+- Windows file-picker fix (`canSelectFolders: false`) and `/C:/…` drop-path normalization
+- Chat scroll so new agent text stays below tool groups
+
+### Docs
+
+- README rewritten for this fork (install from source, voice, attach/vision, clipboard)
+
 ## 1.0.4 — 2026-06-10
 
 > Marketplace packaging — strips dev metadata from the VSIX, removes credential-looking sample code and env-file reads, and ships a minimal changelog for validation.

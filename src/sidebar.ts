@@ -9,6 +9,7 @@ import { readWorkspaceDotEnv } from "./dotenv-reader";
 import { resolveVoiceKey, parseVoiceCommand, DEFAULT_SEND_PHRASE } from "./voice";
 import { VoiceRecorder, transcribeAudio, resolveWindowsAudioDevice } from "./voice-recorder";
 import { VoiceStreamer } from "./voice-streamer";
+import { WindowsVoiceSession, speakWindowsTts, plainTextForTts } from "./voice-windows";
 import { MediaRef, isIncompatibleAgentError } from "./acp-dispatch";
 import { locateGrokCli, extensionWasUpgraded } from "./cli-locator";
 import { TerminalManager } from "./terminal-manager";
@@ -20,8 +21,8 @@ import {
   removeChip,
   toggleChip,
 } from "./chips";
-import { buildPrompt } from "./prompt-builder";
-import { parseFileRef, shouldReadFileInline } from "./file-ref";
+import { buildPromptBlocks } from "./prompt-builder";
+import { mimeToImageExt, normalizeAttachPath, parseFileRef, shouldReadFileInline } from "./file-ref";
 import { pickRejectOption, shouldRejectPermission } from "./plan-gate";
 import { appendPlanEntry, decideRestoreState } from "./plan-restore";
 import { planReviewFileBaseName, sanitizePlanReviewFilePart } from "./plan-review";
@@ -54,6 +55,15 @@ type WebviewMsg =
   | { type: "runMcpList" }
   | { type: "showLogs" }
   | { type: "dropFile"; path: string; shift: boolean }
+  /** Clipboard / path-less drop image (base64 payload, no data: prefix). */
+  | { type: "pasteImage"; mimeType: string; data: string; name?: string }
+  /** Path-less file drop from webview (base64); host writes a temp file chip. */
+  | { type: "dropFileBytes"; mimeType?: string; data: string; name?: string }
+  /** Host clipboard bridge — webview Clipboard API is unreliable in VS Code/Cursor. */
+  | { type: "clipboardWrite"; text: string }
+  | { type: "clipboardRead"; requestId: string }
+  /** Webview keyboard focus — drives `grok.chatFocus` context for keybindings. */
+  | { type: "chatFocus"; focused: boolean }
   | { type: "permissionAnswer"; requestId: number | string; optionId: string }
   | { type: "exitPlanAnswer"; requestId: number | string; verdict: "approved" | "abandoned" | "rejected"; comment?: string }
   | { type: "questionAnswer"; requestId: number | string; answers?: Record<string, string>; annotations?: Record<string, { notes?: string; preview?: string }> }
@@ -123,6 +133,14 @@ export class GrokSidebar implements vscode.WebviewViewProvider {
   // Stored so a "grok send" can transparently restart a fresh stream (each
   // message = one clean utterance) without re-resolving the mic device.
   private voiceStreamCtx?: { key: string; ffmpegPath: string; device?: string; phrase: string; keyterms: string[] };
+  /** Windows System.Speech continuous dictation (no xAI / ffmpeg). */
+  private windowsVoice?: WindowsVoiceSession;
+  private windowsVoicePhrase = DEFAULT_SEND_PHRASE;
+  private windowsVoiceFinalizing = false;
+  /** Accumulate agent prose this turn for optional Windows TTS. */
+  private agentSpeakBuf = "";
+  /** After a voice-submitted prompt, speak the agent reply via Windows TTS. */
+  private speakNextAgentReply = false;
   private configWatcher?: vscode.Disposable;
   private autoApprove = false;
   private planActive = false;
@@ -228,11 +246,50 @@ export class GrokSidebar implements vscode.WebviewViewProvider {
         !IS_MARKETPLACE_BUILD &&
         (e.affectsConfiguration("grok.voiceApiKey") ||
           e.affectsConfiguration("grok.ffmpegPath") ||
-          e.affectsConfiguration("grok.voiceSendPhrase"))
+          e.affectsConfiguration("grok.voiceSendPhrase") ||
+          e.affectsConfiguration("grok.voiceEngine") ||
+          e.affectsConfiguration("grok.voiceTts"))
       ) {
         this.postVoiceConfigured();
       }
     });
+  }
+
+  /**
+   * Which STT backend to use. `auto` = Windows System.Speech on win32 (no API
+   * key), otherwise xAI cloud STT. Explicit `windows` / `xai` override.
+   */
+  private resolveVoiceEngine(): "windows" | "xai" {
+    if (IS_MARKETPLACE_BUILD) return "xai";
+    const raw = (vscode.workspace.getConfiguration("grok").get<string>("voiceEngine", "auto") || "auto").toLowerCase();
+    if (raw === "windows") return "windows";
+    if (raw === "xai") return "xai";
+    return process.platform === "win32" ? "windows" : "xai";
+  }
+
+  private voiceTtsEnabled(): boolean {
+    return !!vscode.workspace.getConfiguration("grok").get<boolean>("voiceTts", true);
+  }
+
+  private onAgentTurnStart(): void {
+    this.agentSpeakBuf = "";
+  }
+
+  /** After a voice-originated turn, read the agent reply with Windows SAPI. */
+  private maybeSpeakAgentReply(): void {
+    if (!this.speakNextAgentReply) {
+      this.agentSpeakBuf = "";
+      return;
+    }
+    this.speakNextAgentReply = false;
+    if (!this.voiceTtsEnabled() || process.platform !== "win32") {
+      this.agentSpeakBuf = "";
+      return;
+    }
+    const plain = plainTextForTts(this.agentSpeakBuf);
+    this.agentSpeakBuf = "";
+    if (!plain) return;
+    void speakWindowsTts(plain, { log: (m) => this.output.appendLine(m) });
   }
 
   insertActiveMention(opts?: { selection?: boolean; uri?: vscode.Uri }): void {
@@ -1076,6 +1133,9 @@ See design doc for the full rollout diagram.`;
     client.on("messageChunk", (text: string) => {
       if (gen !== this.sessionGen) return;
       this.inUserMessage = false;
+      if (this.speakNextAgentReply && typeof text === "string") {
+        this.agentSpeakBuf += text;
+      }
       this.post({ type: "messageChunk", text });
     });
     client.on("userMessageChunk", (text: string) => {
@@ -1378,6 +1438,32 @@ See design doc for the full rollout diagram.`;
       case "dropFile":
         this.addDroppedFile(msg.path, msg.shift);
         break;
+      case "pasteImage":
+        await this.addPastedImage(msg.mimeType, msg.data, msg.name);
+        break;
+      case "dropFileBytes":
+        await this.addDroppedFileBytes(msg.data, msg.name, msg.mimeType);
+        break;
+      case "clipboardWrite":
+        try {
+          await vscode.env.clipboard.writeText(msg.text ?? "");
+        } catch (e) {
+          this.output.appendLine(`[clipboard] write failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        break;
+      case "clipboardRead": {
+        let text = "";
+        try {
+          text = await vscode.env.clipboard.readText();
+        } catch (e) {
+          this.output.appendLine(`[clipboard] read failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        this.post({ type: "clipboardText", requestId: msg.requestId, text });
+        break;
+      }
+      case "chatFocus":
+        void vscode.commands.executeCommand("setContext", "grok.chatFocus", !!msg.focused);
+        break;
       case "permissionAnswer":
         this.client?.respondPermission(msg.requestId, msg.optionId);
         break;
@@ -1579,16 +1665,21 @@ See design doc for the full rollout diagram.`;
   }
 
   private async pickFileFromComputer(): Promise<void> {
+    // Windows/Linux: canSelectFiles + canSelectFolders together forces a
+    // *folder-only* dialog (VS Code API). Files grey out / cannot be chosen.
+    // Prefer file selection; folders aren't needed for chat context chips.
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
     const picked = await vscode.window.showOpenDialog({
       canSelectFiles: true,
-      canSelectFolders: true,
+      canSelectFolders: false,
       canSelectMany: true,
       openLabel: "Add to chat",
+      defaultUri: workspaceRoot,
       filters: {
-        "All files": ["*"],
         Images: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"],
         Documents: ["pdf", "docx", "txt", "md", "csv", "xlsx"],
-        Code: ["ts", "tsx", "js", "jsx", "py", "go", "rs", "java", "json"],
+        Code: ["ts", "tsx", "js", "jsx", "py", "go", "rs", "java", "json", "dart", "php"],
+        "All files": ["*"],
       },
     });
     if (!picked || picked.length === 0) return;
@@ -1606,8 +1697,7 @@ See design doc for the full rollout diagram.`;
     return resolveVoiceKey({ setting, env });
   }
 
-  /** Tell the webview whether a voice API key is resolvable, so the mic button
-   *  can show a "needs setup" hint up front instead of only failing on click. */
+  /** Tell the webview whether voice is ready (Windows speech or an xAI STT key). */
   private postVoiceConfigured(): void {
     if (IS_MARKETPLACE_BUILD) {
       this.post({ type: "voiceConfigured", value: false, sendPhrase: DEFAULT_SEND_PHRASE });
@@ -1615,9 +1705,11 @@ See design doc for the full rollout diagram.`;
     }
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
     const cfg = vscode.workspace.getConfiguration("grok");
+    const engine = this.resolveVoiceEngine();
+    const ready = engine === "windows" || !!this.resolveVoiceApiKey(cwd);
     this.post({
       type: "voiceConfigured",
-      value: !!this.resolveVoiceApiKey(cwd),
+      value: ready,
       sendPhrase: cfg.get<string>("voiceSendPhrase", DEFAULT_SEND_PHRASE),
     });
   }
@@ -1626,12 +1718,12 @@ See design doc for the full rollout diagram.`;
   private async promptVoiceKeySetup(): Promise<void> {
     if (IS_MARKETPLACE_BUILD) return;
     const pick = await vscode.window.showErrorMessage(
-      "Voice input needs an xAI Speech-to-Text key. Set the grok.voiceApiKey setting in VS Code (separate from your Grok CLI login).",
+      "Voice input needs an xAI Speech-to-Text key (or set grok.voiceEngine to \"windows\" for free system speech). Set the grok.voiceApiKey setting in VS Code (separate from your Grok CLI login).",
       "Open Settings",
       "Get a Key",
     );
     if (pick === "Open Settings") {
-      await vscode.commands.executeCommand("workbench.action.openSettings", "grok.voiceApiKey");
+      await vscode.commands.executeCommand("workbench.action.openSettings", "grok.voiceEngine");
     } else if (pick === "Get a Key") {
       await vscode.env.openExternal(vscode.Uri.parse("https://console.x.ai"));
     }
@@ -1643,6 +1735,11 @@ See design doc for the full rollout diagram.`;
   private async handleVoiceStart(): Promise<void> {
     if (IS_MARKETPLACE_BUILD) {
       this.post({ type: "voiceError" });
+      return;
+    }
+    // Prefer Windows System.Speech on win32 (auto) — no API key / ffmpeg.
+    if (this.resolveVoiceEngine() === "windows") {
+      await this.startWindowsVoice();
       return;
     }
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
@@ -1682,6 +1779,96 @@ See design doc for the full rollout diagram.`;
       }
       this.post({ type: "voiceError" });
     }
+  }
+
+  /** Windows System.Speech continuous dictation (mic → partials → composer). */
+  private async startWindowsVoice(): Promise<void> {
+    this.stopVoiceInput();
+    const cfg = vscode.workspace.getConfiguration("grok");
+    const phrase = cfg.get<string>("voiceSendPhrase", DEFAULT_SEND_PHRASE);
+    this.windowsVoicePhrase = phrase;
+    this.windowsVoiceFinalizing = false;
+    const session = new WindowsVoiceSession();
+    this.windowsVoice = session;
+    const isCurrent = () => this.windowsVoice === session;
+
+    session.on("partial", (ev: { text: string; speechFinal: boolean }) => {
+      if (!isCurrent()) return;
+      this.post({ type: "voicePartial", text: ev.text });
+      if (ev.speechFinal && phrase) {
+        const parsed = parseVoiceCommand(ev.text, phrase);
+        if (parsed.send) this.commitWindowsVoice(parsed.text);
+      }
+    });
+    session.on("error", (e: Error) => {
+      if (!isCurrent()) return;
+      this.output.appendLine(`[voice:win] ${e.message}`);
+      if (!this.windowsVoiceFinalizing) {
+        vscode.window.showErrorMessage(`Windows speech failed: ${e.message}`);
+        this.post({ type: "voiceError" });
+      }
+      this.windowsVoice = undefined;
+    });
+    session.on("ended", () => {
+      if (isCurrent() && !this.windowsVoiceFinalizing) {
+        void this.finalizeWindowsVoice();
+      }
+    });
+
+    try {
+      await session.start({ log: (m) => this.output.appendLine(m) });
+      if (!isCurrent()) {
+        session.cancel();
+        return;
+      }
+      this.post({ type: "voiceState", status: "listening" });
+    } catch (e) {
+      if (!isCurrent()) return;
+      this.windowsVoice = undefined;
+      const msg = (e as Error).message;
+      this.output.appendLine(`[voice:win] start failed: ${msg}`);
+      vscode.window.showErrorMessage(msg);
+      this.post({ type: "voiceError" });
+    }
+  }
+
+  /** "grok send" under Windows speech: submit and keep listening. */
+  private commitWindowsVoice(text: string): void {
+    const old = this.windowsVoice;
+    this.windowsVoice = undefined;
+    old?.cancel();
+    if (text.trim()) {
+      this.speakNextAgentReply = this.voiceTtsEnabled();
+      this.post({ type: "voiceSubmit", text: text.trim() });
+    }
+    void this.startWindowsVoice();
+  }
+
+  private async finalizeWindowsVoice(): Promise<void> {
+    if (this.windowsVoiceFinalizing) return;
+    this.windowsVoiceFinalizing = true;
+    const session = this.windowsVoice;
+    this.windowsVoice = undefined;
+    if (!session) {
+      this.windowsVoiceFinalizing = false;
+      return;
+    }
+    this.post({ type: "voiceState", status: "transcribing" });
+    let finalText = "";
+    try {
+      finalText = await session.stop();
+    } catch {
+      finalText = session.transcript;
+    }
+    const phrase = this.windowsVoicePhrase || DEFAULT_SEND_PHRASE;
+    const { text, send } = parseVoiceCommand(finalText, phrase);
+    this.windowsVoiceFinalizing = false;
+    if (!text && !send) {
+      this.post({ type: "voiceError" });
+      return;
+    }
+    if (send || text) this.speakNextAgentReply = this.voiceTtsEnabled();
+    this.post({ type: "voiceTranscript", text, send });
   }
 
   /** Begin a hands-free streaming session. Resolves the mic device once, then
@@ -1769,7 +1956,10 @@ See design doc for the full rollout diagram.`;
     const old = this.voiceStreamer;
     this.voiceStreamer = undefined; // detach so late events are ignored
     old?.cancel();
-    if (text.trim()) this.post({ type: "voiceSubmit", text: text.trim() });
+    if (text.trim()) {
+      this.speakNextAgentReply = this.voiceTtsEnabled();
+      this.post({ type: "voiceSubmit", text: text.trim() });
+    }
     void this.openVoiceStream(); // reuses cached device → fast restart
   }
 
@@ -1792,17 +1982,22 @@ See design doc for the full rollout diagram.`;
       this.post({ type: "voiceError" });
       return;
     }
+    if (send || text) this.speakNextAgentReply = this.voiceTtsEnabled();
     this.post({ type: "voiceTranscript", text, send });
   }
 
   /** Hard-stop any voice capture (no transcript) and reset the mic to idle.
    *  Called on session switch/restart so listening never bleeds across sessions. */
   private stopVoiceInput(): void {
-    const wasActive = !!this.voiceStreamer || this.voiceRecorder.active;
+    const wasActive =
+      !!this.voiceStreamer || this.voiceRecorder.active || !!this.windowsVoice;
     this.voiceStreamer?.cancel();
     this.voiceStreamer = undefined;
     this.voiceStreamCtx = undefined;
     this.voiceFinalizing = false;
+    this.windowsVoiceFinalizing = false;
+    this.windowsVoice?.cancel();
+    this.windowsVoice = undefined;
     this.voiceRecorder.cancel();
     try { if (this.voiceTempPath) fs.unlinkSync(this.voiceTempPath); } catch { /* best effort */ }
     this.voiceTempPath = undefined;
@@ -1813,6 +2008,11 @@ See design doc for the full rollout diagram.`;
   private async handleVoiceStop(): Promise<void> {
     if (IS_MARKETPLACE_BUILD) {
       this.post({ type: "voiceError" });
+      return;
+    }
+    // Windows system speech path.
+    if (this.windowsVoice) {
+      await this.finalizeWindowsVoice();
       return;
     }
     // Streaming path: finalize the live stream.
@@ -1852,6 +2052,7 @@ See design doc for the full rollout diagram.`;
         this.post({ type: "voiceError" });
         return;
       }
+      if (send || text) this.speakNextAgentReply = this.voiceTtsEnabled();
       this.post({ type: "voiceTranscript", text, send });
     } catch (e) {
       this.output.appendLine(`[voice] transcription failed: ${(e as Error).message}`);
@@ -1943,8 +2144,19 @@ See design doc for the full rollout diagram.`;
   }
 
   private addDroppedFile(absPath: string, shiftHeld: boolean): void {
-    if (!fs.existsSync(absPath)) return;
-    const uri = vscode.Uri.file(absPath);
+    // Webview drag-drop on Windows often yields `/C:/...` (from file:///…);
+    // existsSync fails silently unless we normalize first.
+    const resolved = normalizeAttachPath(absPath);
+    if (!resolved || !fs.existsSync(resolved)) {
+      this.output.appendLine(
+        `[attach] path not found: raw=${JSON.stringify(absPath)} normalized=${JSON.stringify(resolved)}`,
+      );
+      void vscode.window.showWarningMessage(
+        `Couldn't attach file (path not found). Try + → Upload files, or paste an image with Ctrl+V.`,
+      );
+      return;
+    }
+    const uri = vscode.Uri.file(resolved);
     const relPath = vscode.workspace.asRelativePath(uri);
     if (shiftHeld) {
       // Only read the whole file (to count lines for an inline selection) when
@@ -1952,21 +2164,90 @@ See design doc for the full rollout diagram.`;
       // to a plain no-selection chip.
       let totalLines: number | undefined;
       try {
-        if (shouldReadFileInline(fs.statSync(absPath).size)) {
-          totalLines = fs.readFileSync(absPath, "utf8").split("\n").length;
+        if (shouldReadFileInline(fs.statSync(resolved).size)) {
+          totalLines = fs.readFileSync(resolved, "utf8").split("\n").length;
         }
       } catch {
         /* fall back to a no-selection chip */
       }
       this.chips.push(
         totalLines != null
-          ? makeExplicitChip(absPath, relPath, 1, totalLines)
-          : makeExplicitChip(absPath, relPath),
+          ? makeExplicitChip(resolved, relPath, 1, totalLines)
+          : makeExplicitChip(resolved, relPath),
       );
     } else {
-      this.chips.push(makeExplicitChip(absPath, relPath));
+      this.chips.push(makeExplicitChip(resolved, relPath));
     }
     this.postChips();
+    this.output.appendLine(`[attach] chip added: ${resolved}`);
+  }
+
+  /**
+   * Persist a clipboard image (from the webview paste handler) into global
+   * storage and attach it as a normal file chip.
+   */
+  private async addPastedImage(
+    mimeType: string,
+    base64: string,
+    name?: string,
+  ): Promise<void> {
+    await this.writeTempAttach(base64, name || "clipboard.png", mimeType, "clipboard-pastes");
+  }
+
+  /** Path-less drag-drop from the webview (Electron often strips File.path). */
+  private async addDroppedFileBytes(
+    base64: string,
+    name?: string,
+    mimeType?: string,
+  ): Promise<void> {
+    await this.writeTempAttach(base64, name || "dropped-file", mimeType, "dropped-files");
+  }
+
+  private async writeTempAttach(
+    base64: string,
+    name: string,
+    mimeType: string | undefined,
+    subdir: string,
+  ): Promise<void> {
+    if (!base64 || typeof base64 !== "string") {
+      void vscode.window.showWarningMessage("Attachment was empty.");
+      return;
+    }
+    try {
+      const isImage = !!(mimeType && mimeType.startsWith("image/")) ||
+        /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
+      const ext = isImage
+        ? mimeToImageExt(mimeType || "image/png")
+        : (path.extname(name) || "");
+      const safeName = (name || `attach${ext || ".bin"}`)
+        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
+        .slice(0, 80);
+      const stamp = Date.now();
+      const fileName =
+        ext && safeName.toLowerCase().endsWith(ext.toLowerCase())
+          ? `${stamp}-${safeName}`
+          : `${stamp}-${safeName}${ext}`;
+      const dir = vscode.Uri.joinPath(this.context.globalStorageUri, subdir);
+      await vscode.workspace.fs.createDirectory(dir);
+      const uri = vscode.Uri.joinPath(dir, fileName);
+      const buf = Buffer.from(base64, "base64");
+      if (buf.length === 0) {
+        void vscode.window.showWarningMessage("Attachment was empty.");
+        return;
+      }
+      if (buf.length > 25 * 1024 * 1024) {
+        void vscode.window.showWarningMessage("File is too large to attach (>25MB).");
+        return;
+      }
+      await vscode.workspace.fs.writeFile(uri, buf);
+      this.addDroppedFile(uri.fsPath, false);
+      this.reveal();
+      this.output.appendLine(`[attach] ${subdir} saved: ${uri.fsPath} (${buf.length} bytes)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.output.appendLine(`[attach] temp attach failed: ${msg}`);
+      void vscode.window.showErrorMessage(`Couldn't attach file: ${msg}`);
+    }
   }
 
   private async handleSend(text: string, chips: FileChip[]): Promise<void> {
@@ -1974,10 +2255,19 @@ See design doc for the full rollout diagram.`;
     if (!client) return;
     const gen = this.sessionGen;
 
-    const finalPrompt = buildPrompt(text, chips, {
+    // Image chips → ACP image content blocks (real vision). Code/docs stay text.
+    const { blocks, imageCount, warnings } = buildPromptBlocks(text, chips, {
       readFile: (p) => fs.readFileSync(p, "utf8"),
+      readFileBase64: (p) => fs.readFileSync(p).toString("base64"),
       extName: (p) => path.extname(p),
+      fileSize: (p) => fs.statSync(p).size,
     });
+    for (const w of warnings) this.output.appendLine(`[attach] ${w}`);
+    if (imageCount > 0) {
+      this.output.appendLine(
+        `[attach] sending ${imageCount} image block(s) via ACP vision (${blocks.length} content block(s) total)`,
+      );
+    }
 
     this.chips = [];
     this.postChips();
@@ -1989,6 +2279,7 @@ See design doc for the full rollout diagram.`;
     this.userMessageCount += 1;
     this.inUserMessage = false; // live send isn't part of the streamed-chunk count path
     this.post({ type: "userMessage", text, chips: sentChips });
+    this.onAgentTurnStart();
     this.post({ type: "agentStart" });
 
     try {
@@ -1996,7 +2287,7 @@ See design doc for the full rollout diagram.`;
       // turn first (no-op once primed / on a restored, already-primed session).
       await this.ensurePrimed(client, gen);
       if (gen !== this.sessionGen) return;
-      const meta = await client.prompt(finalPrompt);
+      const meta = await client.prompt(blocks);
       if (gen !== this.sessionGen) return; // session was switched mid-turn
       // Skip agentEnd if a verdict was clicked mid-turn (afterTurn is queued).
       // Otherwise busy clears here, then the user could send during the brief
@@ -2004,12 +2295,15 @@ See design doc for the full rollout diagram.`;
       // own agentEnd at the end of its prompt, so busy stays true throughout.
       if (!this.afterTurn) {
         this.post({ type: "agentEnd", meta });
+        this.maybeSpeakAgentReply();
       }
       this.maybeGenerateTitle();
     } catch (err) {
       if (gen !== this.sessionGen) return; // prompt rejected because we disposed the old client — don't leak the error into the new session
       const e = err as any;
       const message = e?.data?.message ?? e?.message ?? String(err);
+      this.speakNextAgentReply = false;
+      this.agentSpeakBuf = "";
       this.post({ type: "agentError", text: message });
     } finally {
       // If the user approved/declined a plan mid-turn, the follow-up action was
@@ -2101,6 +2395,15 @@ See design doc for the full rollout diagram.`;
     if (this.suppressContent && GrokSidebar.SUPPRESS_TYPES.has(message.type)) return;
     if (this.suppressPlanReject && GrokSidebar.PLAN_REJECT_SUPPRESS.has(message.type)) return;
     this.view?.webview.postMessage(message);
+  }
+
+  /**
+   * Workbench keybindings for Ctrl/Cmd+C/V/X/A/Z/Y while Grok is focused.
+   * VS Code/Cursor often never deliver those keys into the webview; the host
+   * claims them when `focusedView == grok.chat || grok.chatFocus` and forwards here.
+   */
+  dispatchModKey(key: "c" | "v" | "x" | "a" | "z" | "y", shiftKey = false): void {
+    this.post({ type: "modKey", key, shiftKey });
   }
 
   /** Show/focus the Grok webview panel (no-op until the view has been resolved once). */

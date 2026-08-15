@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { parseFileRef, shouldReadFileInline, MAX_INLINE_CHIP_BYTES } from "../src/file-ref";
+import {
+  parseFileRef,
+  shouldReadFileInline,
+  MAX_INLINE_CHIP_BYTES,
+  normalizeAttachPath,
+  mimeToImageExt,
+} from "../src/file-ref";
 
 describe("parseFileRef", () => {
   it("returns the bare path when there is no line suffix", () => {
@@ -40,5 +46,43 @@ describe("shouldReadFileInline", () => {
   it("rejects files larger than the threshold", () => {
     expect(shouldReadFileInline(MAX_INLINE_CHIP_BYTES + 1)).toBe(false);
     expect(shouldReadFileInline(500 * 1024 * 1024)).toBe(false);
+  });
+});
+
+describe("normalizeAttachPath (Windows drop bug)", () => {
+  it("converts file:///C:/... and /C:/... forms to a real Windows path", () => {
+    expect(normalizeAttachPath("file:///C:/Users/me/shot.png", "win32")).toBe(
+      "C:\\Users\\me\\shot.png",
+    );
+    expect(normalizeAttachPath("/C:/Users/me/shot.png", "win32")).toBe(
+      "C:\\Users\\me\\shot.png",
+    );
+    expect(normalizeAttachPath("C:/Users/me/shot.png", "win32")).toBe(
+      "C:\\Users\\me\\shot.png",
+    );
+  });
+
+  it("leaves POSIX paths alone on non-Windows", () => {
+    expect(normalizeAttachPath("file:///home/me/shot.png", "linux")).toBe(
+      "/home/me/shot.png",
+    );
+    expect(normalizeAttachPath("/home/me/shot.png", "linux")).toBe(
+      "/home/me/shot.png",
+    );
+  });
+
+  it("strips wrapping quotes", () => {
+    expect(normalizeAttachPath('"C:\\Users\\me\\a.png"', "win32")).toBe(
+      "C:\\Users\\me\\a.png",
+    );
+  });
+});
+
+describe("mimeToImageExt", () => {
+  it("maps common image MIME types", () => {
+    expect(mimeToImageExt("image/png")).toBe(".png");
+    expect(mimeToImageExt("image/jpeg")).toBe(".jpg");
+    expect(mimeToImageExt("image/webp")).toBe(".webp");
+    expect(mimeToImageExt("unknown")).toBe(".png");
   });
 });

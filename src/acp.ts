@@ -286,11 +286,24 @@ export class AcpClient extends EventEmitter {
     // current_mode_update will arrive as a session/update
   }
 
-  async prompt(text: string): Promise<PromptResultMeta> {
+  /**
+   * Send a user turn. Accepts plain text (legacy) or an ACP content-block array
+   * (text + image vision). Image blocks are base64 PNG/JPEG/etc.
+   */
+  async prompt(
+    input:
+      | string
+      | Array<
+          | { type: "text"; text: string }
+          | { type: "image"; mimeType: string; data: string; uri?: string }
+        >,
+  ): Promise<PromptResultMeta> {
     if (!this.sessionId) throw new Error("no session");
+    const prompt =
+      typeof input === "string" ? [{ type: "text" as const, text: input }] : input;
     const result = await this.request("session/prompt", {
       sessionId: this.sessionId,
-      prompt: [{ type: "text", text }],
+      prompt,
     });
     const meta = extractPromptMeta(result);
     this.lastMeta = meta;

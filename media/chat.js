@@ -1484,10 +1484,31 @@
     state.activeToolGroupEl = null;
   }
 
+  // LOCAL PATCH: seal early agent/thought bubbles above a new tool group so
+  // later agent text lands *below* the tools (latest work stays visible).
+  function sealLiveOutputAbove() {
+    flushAgent();
+    flushThought();
+    state.activeAgentEl = null;
+    state.activeAgentRaw = "";
+    state.activeThoughtEl = null;
+    state.activeThoughtHdrEl = null;
+    state.thoughtBuffer = "";
+    state.thoughtStartTime = null;
+  }
+
+  function agentBubbleIsStale() {
+    if (!state.activeAgentEl || !messagesEl) return false;
+    const wrapper = state.activeAgentEl.closest(".msg-wrapper") ?? state.activeAgentEl.parentElement;
+    if (!wrapper || !wrapper.parentElement) return false;
+    return wrapper.nextElementSibling != null;
+  }
+
   function addToToolGroup(call) {
     hideAgentPending();
     clearWelcome();
     if (!state.activeToolGroupEl) {
+      sealLiveOutputAbove();
       const el = document.createElement("div");
       el.className = "tool-group in-progress";
       el._calls = [];
@@ -1730,6 +1751,12 @@
     state.skipUserBubble = false; // marker-only verdict turn is over
     closeToolGroup();
     clearWelcome();
+    // LOCAL PATCH: if the live agent bubble already has siblings below it
+    // (tools), start a fresh bubble under the tools instead of growing above.
+    if (agentBubbleIsStale()) {
+      state.activeAgentEl = null;
+      state.activeAgentRaw = "";
+    }
     if (!state.activeAgentEl) {
       state.activeAgentEl = addMessage("agent", "");
       state.activeAgentRaw = "";
@@ -1870,7 +1897,13 @@
   }
 
   function scrollToBottom() {
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    // LOCAL PATCH: double rAF so layout after tools settles before pinning.
+    requestAnimationFrame(() => {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      requestAnimationFrame(() => {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      });
+    });
   }
 
   // ---------- permission card ----------
@@ -2488,7 +2521,9 @@
       return;
     }
     actionBtn.innerHTML = ICON.mic;
-    actionBtn.title = state.voiceConfigured ? "Voice input" : "Voice — needs setup";
+    actionBtn.title = state.voiceConfigured
+      ? "Voice input (Windows speech / STT)"
+      : "Voice — needs setup";
     actionBtn.classList.add("mic-mode");
     actionBtn.classList.toggle("needs-setup", !state.voiceConfigured);
     actionBtn.disabled = false;
@@ -2642,6 +2677,18 @@
   window.addEventListener("message", (e) => {
     const msg = e.data;
     switch (msg.type) {
+      case "clipboardText": {
+        const resolve = pendingClipboardReads.get(msg.requestId);
+        if (resolve) {
+          pendingClipboardReads.delete(msg.requestId);
+          resolve(typeof msg.text === "string" ? msg.text : "");
+        }
+        break;
+      }
+      case "modKey":
+        // Host keybinding (focusedView == grok.chat) when workbench steals C/V/X/A.
+        runModKey(String(msg.key || "").toLowerCase(), !!msg.shiftKey);
+        break;
       case "initialState":
         state.useCtrlEnter = msg.useCtrlEnter;
         state.effort = msg.effort || "";
@@ -3165,26 +3212,478 @@
     document.body.classList.remove("dragging");
     if (dropOverlay) dropOverlay.hidden = true;
   }
+
+  /**
+   * Convert a file:// URI or Windows-mangled path to something the host can
+   * open. Host also runs normalizeAttachPath; we fix the common webview forms
+   * here so logs and chips look sane.
+   */
+  function fileUriOrPathToFs(raw) {
+    let p = String(raw || "").trim();
+    if (!p) return "";
+    if (/^file:/i.test(p)) {
+      try {
+        // URL parser handles file:///C:/... correctly enough for path extraction
+        const u = new URL(p);
+        p = decodeURIComponent(u.pathname || "");
+      } catch {
+        p = decodeURIComponent(p.replace(/^file:\/\//i, ""));
+      }
+    }
+    // Windows: /C:/Users/... → C:/Users/...
+    if (/^\/[A-Za-z]:\//.test(p) || /^\/[A-Za-z]:\\/.test(p)) p = p.slice(1);
+    return p;
+  }
+
+  function postDropPath(path, shift) {
+    const cleaned = fileUriOrPathToFs(path);
+    if (!cleaned) return;
+    vscode.postMessage({ type: "dropFile", path: cleaned, shift: !!shift });
+  }
+
   document.addEventListener("dragenter", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     dragDepth++;
     showDropOverlay();
   });
-  document.addEventListener("dragover", (e) => e.preventDefault());
-  document.addEventListener("dragleave", () => {
+  document.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+  });
+  document.addEventListener("dragleave", (e) => {
+    e.preventDefault();
     dragDepth = Math.max(0, dragDepth - 1);
     if (dragDepth === 0) hideDropOverlay();
   });
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = String(reader.result || "");
+        const m = dataUrl.match(/^data:[^;]*;base64,(.+)$/);
+        resolve(m ? m[1] : "");
+      };
+      reader.onerror = () => reject(reader.error || new Error("read failed"));
+      reader.readAsDataURL(blob);
+    });
+  }
+
   document.addEventListener("drop", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     hideDropOverlay();
-    const data = e.dataTransfer?.getData("text/uri-list");
+    const shift = e.shiftKey;
+
+    // Prefer path when Electron exposes it; otherwise ship bytes (VS Code
+    // webviews often strip File.path on Windows).
+    const fileList = e.dataTransfer?.files;
+    if (fileList && fileList.length) {
+      (async () => {
+        for (let i = 0; i < fileList.length; i++) {
+          const f = fileList[i];
+          if (!f) continue;
+          if (f.path) {
+            postDropPath(f.path, shift);
+            continue;
+          }
+          try {
+            if (f.size > 25 * 1024 * 1024) continue;
+            const data = await blobToBase64(f);
+            if (!data) continue;
+            if (f.type && f.type.indexOf("image/") === 0) {
+              vscode.postMessage({
+                type: "pasteImage",
+                mimeType: f.type || "image/png",
+                data,
+                name: f.name || "dropped.png",
+              });
+            } else {
+              vscode.postMessage({
+                type: "dropFileBytes",
+                mimeType: f.type || "application/octet-stream",
+                data,
+                name: f.name || "dropped-file",
+              });
+            }
+          } catch (err) {
+            // host logs aren't available here; fail quietly per file
+          }
+        }
+      })();
+      return;
+    }
+
+    const data =
+      e.dataTransfer?.getData("text/uri-list") ||
+      e.dataTransfer?.getData("text/plain") ||
+      "";
     if (!data) return;
-    const uris = data.split(/\r?\n/).filter((l) => l && !l.startsWith("#"));
-    for (const uri of uris) {
-      const m = uri.match(/^file:\/\/(.+)$/);
-      if (!m) continue;
-      vscode.postMessage({ type: "dropFile", path: decodeURIComponent(m[1]), shift: e.shiftKey });
+    const lines = data.split(/\r?\n/).filter((l) => l && !l.startsWith("#"));
+    for (const line of lines) {
+      const uri = line.trim();
+      if (/^file:/i.test(uri)) {
+        postDropPath(uri, shift);
+      } else if (/^([A-Za-z]:[\\/]|\/)/.test(uri) || uri.startsWith("\\\\")) {
+        postDropPath(uri, shift);
+      }
+    }
+  });
+
+  /**
+   * Paste images from the system clipboard into the chat as attachments.
+   * Screenshots / "Copy image" land as image/* clipboard items; we base64 them
+   * and hand off to the host (which writes a temp file + chip).
+   * Plain text paste is left alone so the composer still works.
+   */
+  function postClipboardImageBlob(blob, nameHint) {
+    return new Promise((resolve) => {
+      if (!blob) { resolve(false); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = String(reader.result || "");
+        const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!m) { resolve(false); return; }
+        const mimeType = m[1] || blob.type || "image/png";
+        const name = nameHint || blob.name || "clipboard.png";
+        vscode.postMessage({ type: "pasteImage", mimeType, data: m[2], name });
+        resolve(true);
+      };
+      reader.onerror = () => resolve(false);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  document.addEventListener("paste", async (e) => {
+    const cd = e.clipboardData;
+    if (!cd) return;
+
+    const imageBlobs = [];
+    // items[] is the usual path for screenshot / "Copy image"
+    if (cd.items && cd.items.length) {
+      for (let i = 0; i < cd.items.length; i++) {
+        const item = cd.items[i];
+        if (item && item.type && item.type.indexOf("image/") === 0) {
+          const f = item.getAsFile();
+          if (f) imageBlobs.push(f);
+        }
+      }
+    }
+    // files[] fallback (some hosts put the image there)
+    if (imageBlobs.length === 0 && cd.files && cd.files.length) {
+      for (let i = 0; i < cd.files.length; i++) {
+        const f = cd.files[i];
+        if (f && f.type && f.type.indexOf("image/") === 0) imageBlobs.push(f);
+      }
+    }
+
+    if (imageBlobs.length === 0) {
+      // No image — if the clipboard is a local file path, attach it.
+      const text = (cd.getData("text/plain") || "").trim();
+      if (
+        text &&
+        !text.includes("\n") &&
+        (/\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(text) || /^file:/i.test(text)) &&
+        (/^([A-Za-z]:[\\/]|\/|\\\\|file:)/i.test(text))
+      ) {
+        e.preventDefault();
+        postDropPath(text, e.shiftKey);
+      }
+      return;
+    }
+
+    e.preventDefault();
+    for (const blob of imageBlobs) {
+      await postClipboardImageBlob(blob);
+    }
+  });
+
+  /**
+   * VS Code / Cursor often steals Ctrl/Cmd+C/V/X/A/Z for the code editor, so the
+   * webview never gets a native clipboard/undo action. Re-implement the common
+   * edit shortcuts here (capture phase) + host keybindings (modKey) + host
+   * clipboard bridge (vscode.env.clipboard) so transcript copy + composer paste
+   * keep working after Marketplace updates / host focus changes.
+   *
+   * Use KeyboardEvent.code (KeyC/…) — e.key breaks on non-Latin layouts (RU etc.).
+   */
+  const pendingClipboardReads = new Map(); // requestId -> resolve(text)
+
+  function isEditableTarget(el) {
+    if (!el || el.disabled || el.readOnly) return false;
+    if (el.isContentEditable) return true;
+    const tag = (el.tagName || "").toLowerCase();
+    return tag === "textarea" || (tag === "input" && /^(text|search|url|tel|password|email|number)$/i.test(el.type || "text"));
+  }
+
+  /** Map physical key → letter for mod shortcuts (layout-independent). */
+  function modLetterFromEvent(e) {
+    const code = String(e && e.code || "");
+    if (code === "KeyC") return "c";
+    if (code === "KeyV") return "v";
+    if (code === "KeyX") return "x";
+    if (code === "KeyA") return "a";
+    if (code === "KeyZ") return "z";
+    if (code === "KeyY") return "y";
+    const key = String(e && e.key || "").toLowerCase();
+    if (key === "c" || key === "v" || key === "x" || key === "a" || key === "z" || key === "y") return key;
+    return "";
+  }
+
+  function getSelectedText() {
+    const el = document.activeElement;
+    if (isEditableTarget(el) && typeof el.selectionStart === "number") {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      if (start !== end) return String(el.value || "").slice(start, end);
+    }
+    const sel = window.getSelection && window.getSelection();
+    return sel ? String(sel.toString()) : "";
+  }
+
+  function syncComposerHelpers() {
+    try {
+      if (typeof updateSlash === "function") updateSlash();
+      if (typeof renderInputHighlight === "function") renderInputHighlight();
+    } catch (_) { /* optional helpers */ }
+  }
+
+  function insertTextIntoEditable(el, text) {
+    if (!el || text == null) return;
+    // Prefer insertText so the browser keeps an undo stack (el.value = wipes it).
+    try {
+      el.focus();
+      if (document.execCommand && document.execCommand("insertText", false, String(text))) {
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        syncComposerHelpers();
+        return;
+      }
+    } catch (_) { /* fall through */ }
+    if (typeof el.selectionStart === "number") {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const value = String(el.value || "");
+      el.value = value.slice(0, start) + text + value.slice(end);
+      const pos = start + String(text).length;
+      try {
+        el.selectionStart = el.selectionEnd = pos;
+      } catch (_) { /* some inputs reject selection */ }
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      syncComposerHelpers();
+      return;
+    }
+    if (el.isContentEditable) {
+      try { document.execCommand("insertText", false, text); } catch (_) { /* ignore */ }
+    }
+  }
+
+  function deleteEditableSelection(el) {
+    if (!el || typeof el.selectionStart !== "number") return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    if (start === end) return;
+    const value = String(el.value || "");
+    el.value = value.slice(0, start) + value.slice(end);
+    try {
+      el.selectionStart = el.selectionEnd = start;
+    } catch (_) { /* ignore */ }
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    try {
+      if (typeof updateSlash === "function") updateSlash();
+      if (typeof renderInputHighlight === "function") renderInputHighlight();
+    } catch (_) { /* optional helpers */ }
+  }
+
+  function isImageFilePathText(text) {
+    const t = String(text || "").trim();
+    return !!(
+      t &&
+      !t.includes("\n") &&
+      (/\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(t) || /^file:/i.test(t)) &&
+      (/^([A-Za-z]:[\\/]|\/|\\\\|file:)/i.test(t))
+    );
+  }
+
+  async function writeClipboardText(text) {
+    if (!text) return false;
+    // Prefer host bridge — webview Clipboard API often fails in VS Code/Cursor.
+    try {
+      vscode.postMessage({ type: "clipboardWrite", text: String(text) });
+    } catch (_) { /* continue to local fallbacks */ }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (_) { /* fall through */ }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch (_) {
+      // Host write was already requested; treat as success so cut can proceed.
+      return true;
+    }
+  }
+
+  function readClipboardTextHost() {
+    return new Promise((resolve) => {
+      const requestId = "cb-" + Date.now() + "-" + Math.random().toString(36).slice(2, 9);
+      const timer = setTimeout(() => {
+        if (pendingClipboardReads.has(requestId)) {
+          pendingClipboardReads.delete(requestId);
+          resolve("");
+        }
+      }, 2000);
+      pendingClipboardReads.set(requestId, (text) => {
+        clearTimeout(timer);
+        resolve(typeof text === "string" ? text : "");
+      });
+      try {
+        vscode.postMessage({ type: "clipboardRead", requestId });
+      } catch (_) {
+        clearTimeout(timer);
+        pendingClipboardReads.delete(requestId);
+        resolve("");
+      }
+    });
+  }
+
+  async function handleModPaste(e) {
+    // Images first (clipboard.read), then plain text via host bridge.
+    try {
+      if (navigator.clipboard && navigator.clipboard.read) {
+        const items = await navigator.clipboard.read();
+        const imageBlobs = [];
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          const types = item.types || [];
+          for (let j = 0; j < types.length; j++) {
+            const type = types[j];
+            if (type && type.indexOf("image/") === 0) {
+              try {
+                const blob = await item.getType(type);
+                if (blob) imageBlobs.push(blob);
+              } catch (_) { /* skip type */ }
+            }
+          }
+        }
+        if (imageBlobs.length) {
+          for (const blob of imageBlobs) {
+            await postClipboardImageBlob(blob);
+          }
+          return true;
+        }
+      }
+    } catch (_) { /* permission / unsupported */ }
+
+    let text = await readClipboardTextHost();
+    if (!text) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          text = await navigator.clipboard.readText();
+        }
+      } catch (_) { /* ignore */ }
+    }
+    if (!text) return false;
+
+    if (isImageFilePathText(text)) {
+      postDropPath(text.trim(), !!(e && e.shiftKey));
+      return true;
+    }
+
+    let el = document.activeElement;
+    if (!isEditableTarget(el) && input) {
+      // Host-forwarded paste often arrives with focus still on the webview body.
+      try { input.focus(); } catch (_) { /* ignore */ }
+      el = document.activeElement;
+    }
+    if (isEditableTarget(el)) {
+      insertTextIntoEditable(el, text);
+      return true;
+    }
+    // Last resort: put text in the composer so paste is never a silent no-op.
+    if (input) {
+      insertTextIntoEditable(input, text);
+      return true;
+    }
+    return true;
+  }
+
+  function runModKey(key, shiftKey) {
+    const active = document.activeElement;
+    if (key === "a") {
+      const target = isEditableTarget(active) ? active : input;
+      if (target && typeof target.select === "function") {
+        try { target.focus(); } catch (_) { /* ignore */ }
+        target.select();
+      }
+      return;
+    }
+    if (key === "z" || key === "y") {
+      // Ctrl+Z undo; Ctrl+Y / Ctrl+Shift+Z redo. Host may forward these when
+      // the workbench would otherwise undo the editor instead of the composer.
+      const target = isEditableTarget(active) ? active : input;
+      if (!target) return;
+      try { target.focus(); } catch (_) { /* ignore */ }
+      const redo = key === "y" || (key === "z" && !!shiftKey);
+      try {
+        document.execCommand(redo ? "redo" : "undo");
+      } catch (_) { /* ignore */ }
+      target.dispatchEvent(new Event("input", { bubbles: true }));
+      syncComposerHelpers();
+      return;
+    }
+    if (key === "c" || key === "x") {
+      const selected = getSelectedText();
+      if (!selected) return;
+      void writeClipboardText(selected).then((ok) => {
+        if (ok && key === "x" && isEditableTarget(document.activeElement)) {
+          deleteEditableSelection(document.activeElement);
+        }
+      });
+      return;
+    }
+    if (key === "v") {
+      void handleModPaste({ shiftKey: !!shiftKey });
+    }
+  }
+
+  // Capture-phase fallback when the key event actually reaches the webview.
+  // Prefer e.code so RU/DE/… layouts still map physical C/V/X/A/Z/Y keys.
+  document.addEventListener("keydown", (e) => {
+    const mod = e.ctrlKey || e.metaKey;
+    if (!mod || e.altKey) return;
+    const key = modLetterFromEvent(e);
+    if (!key) return;
+    // Leave Ctrl+Shift+C (and friends) alone; Shift+V = paste, Shift+Z = redo.
+    if (e.shiftKey && key !== "v" && key !== "z") return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    runModKey(key, e.shiftKey);
+  }, true);
+
+  // Tell the host when this webview has keyboard focus so keybindings can use
+  // `grok.chatFocus` even if `focusedView == grok.chat` is flaky (secondary bar).
+  function postChatFocus(focused) {
+    try { vscode.postMessage({ type: "chatFocus", focused: !!focused }); } catch (_) { /* ignore */ }
+  }
+  window.addEventListener("focus", () => postChatFocus(true));
+  window.addEventListener("blur", () => postChatFocus(false));
+  document.addEventListener("focusin", () => postChatFocus(true));
+  document.addEventListener("focusout", (e) => {
+    const next = e.relatedTarget;
+    if (!next || (next !== document && !document.documentElement.contains(next))) {
+      postChatFocus(false);
     }
   });
 
@@ -3195,4 +3694,5 @@
   }
   state.startingPhase = true;
   vscode.postMessage({ type: "ready" });
+  postChatFocus(true);
 })();

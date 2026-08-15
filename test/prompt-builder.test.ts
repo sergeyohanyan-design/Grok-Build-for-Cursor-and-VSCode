@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { buildPrompt } from "../src/prompt-builder";
+import {
+  buildPrompt,
+  buildPromptBlocks,
+  isImageFilePath,
+  mimeFromImagePath,
+  MAX_VISION_IMAGE_BYTES,
+} from "../src/prompt-builder";
 import { makeImplicitChip, makeExplicitChip } from "../src/chips";
 
 const deps = {
@@ -11,6 +17,21 @@ const deps = {
   extName: (p: string) => {
     const i = p.lastIndexOf(".");
     return i >= 0 ? p.slice(i) : "";
+  },
+};
+
+const blockDeps = {
+  ...deps,
+  readFileBase64: (p: string) => {
+    if (p === "/shot.png") return "iVBOR-fake-png-b64";
+    if (p === "/photo.jpg") return "jpeg-fake-b64";
+    throw new Error("ENOENT " + p);
+  },
+  fileSize: (p: string) => {
+    if (p === "/shot.png") return 1200;
+    if (p === "/photo.jpg") return 800;
+    if (p === "/huge.png") return MAX_VISION_IMAGE_BYTES + 1;
+    return 0;
   },
 };
 
@@ -59,5 +80,62 @@ describe("buildPrompt", () => {
       extName: () => "",
     });
     expect(out).toContain("```\nall:");
+  });
+});
+
+describe("isImageFilePath / mimeFromImagePath", () => {
+  it("detects image extensions", () => {
+    expect(isImageFilePath("/a.png", (p) => ".png")).toBe(true);
+    expect(isImageFilePath("/a.JPG", (p) => ".JPG")).toBe(true);
+    expect(isImageFilePath("/a.ts", (p) => ".ts")).toBe(false);
+  });
+
+  it("maps mime types", () => {
+    expect(mimeFromImagePath("/x.png")).toBe("image/png");
+    expect(mimeFromImagePath("/x.jpeg")).toBe("image/jpeg");
+    expect(mimeFromImagePath("/x.webp")).toBe("image/webp");
+  });
+});
+
+describe("buildPromptBlocks (vision)", () => {
+  it("embeds image chips as ACP image blocks before text", () => {
+    const img = makeExplicitChip("/shot.png", "shot.png");
+    const code = makeImplicitChip("/a.ts", "src/a.ts");
+    const { blocks, imageCount, warnings } = buildPromptBlocks(
+      "what is wrong here?",
+      [img, code],
+      blockDeps,
+    );
+    expect(imageCount).toBe(1);
+    expect(warnings).toEqual([]);
+    expect(blocks[0]).toEqual({
+      type: "image",
+      mimeType: "image/png",
+      data: "iVBOR-fake-png-b64",
+    });
+    expect(blocks[1]?.type).toBe("text");
+    expect((blocks[1] as { text: string }).text).toContain("[Attached screenshot: shot.png]");
+    expect((blocks[1] as { text: string }).text).toContain("@src/a.ts");
+    expect((blocks[1] as { text: string }).text).toContain("what is wrong here?");
+  });
+
+  it("falls back to @path when image is too large", () => {
+    const huge = makeExplicitChip("/huge.png", "huge.png");
+    const { blocks, imageCount, warnings } = buildPromptBlocks("q", [huge], {
+      ...blockDeps,
+      readFileBase64: () => "should-not-be-used",
+      fileSize: () => MAX_VISION_IMAGE_BYTES + 1,
+    });
+    expect(imageCount).toBe(0);
+    expect(warnings[0]).toMatch(/too large/);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toEqual({ type: "text", text: "@huge.png\n\nq" });
+  });
+
+  it("text-only chips produce a single text block", () => {
+    const a = makeImplicitChip("/a.ts", "a.ts");
+    const { blocks, imageCount } = buildPromptBlocks("hello", [a], blockDeps);
+    expect(imageCount).toBe(0);
+    expect(blocks).toEqual([{ type: "text", text: "@a.ts\n\nhello" }]);
   });
 });
