@@ -1,31 +1,41 @@
 #!/usr/bin/env bash
-# Install the Grok VS Code extension on macOS / Linux / WSL.
+# Install Grok Build for Cursor and VSCode on macOS / Linux / WSL.
 # Usage:  ./scripts/install.sh [path/to/file.vsix]
+# Prefers Cursor, then VS Code. Installs into every editor CLI found.
 # Picks the first .vsix in the repo root, or builds one if none exists.
 
 set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 
-find_code_cli() {
-    for name in code code-insiders; do
+find_editor_clis() {
+    local found=()
+    for name in cursor cursor-insiders code code-insiders; do
         if command -v "$name" >/dev/null 2>&1; then
-            echo "$name"; return 0
+            found+=("$name")
         fi
     done
-    # macOS install paths
     for path in \
+        "/Applications/Cursor.app/Contents/Resources/app/bin/cursor" \
         "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" \
         "/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code-insiders" \
     ; do
-        [ -x "$path" ] && { echo "$path"; return 0; }
+        if [ -x "$path" ]; then
+            local already=0
+            for f in "${found[@]+"${found[@]}"}"; do
+                [ "$f" = "$path" ] && already=1
+            done
+            [ "$already" -eq 0 ] && found+=("$path")
+        fi
     done
-    echo "Could not find VS Code CLI. Install VS Code or add 'code' to PATH." >&2
-    return 1
+    if [ "${#found[@]}" -eq 0 ]; then
+        echo "Could not find Cursor or VS Code CLI. Install Cursor (recommended) or VS Code, or add 'cursor' / 'code' to PATH." >&2
+        return 1
+    fi
+    printf '%s\n' "${found[@]}"
 }
 
 vsix="${1-}"
 if [ -z "$vsix" ]; then
-    # Always rebuild so the installed extension is never stale
     cd "$repo_root"
     [ -d node_modules ] || npm install
     npm run package
@@ -33,8 +43,9 @@ if [ -z "$vsix" ]; then
 fi
 [ -f "$vsix" ] || { echo "vsix not found: $vsix" >&2; exit 1; }
 
-code=$(find_code_cli)
-echo "Installing $vsix via $code"
-"$code" --install-extension "$vsix"
+while IFS= read -r cli; do
+    echo "Installing $vsix via $cli"
+    "$cli" --install-extension "$vsix"
+done < <(find_editor_clis)
 echo
-echo "Done. Reload VS Code (Ctrl+Shift+P -> 'Developer: Reload Window') and click the Grok icon."
+echo "Done. Reload the window (Ctrl+Shift+P -> 'Developer: Reload Window') and click the Grok icon."

@@ -1,7 +1,7 @@
-# Install the Grok VS Code extension on Windows.
+# Install Grok Build for Cursor and VSCode on Windows.
 # Usage:  pwsh scripts\install.ps1
+# Prefers Cursor, then VS Code. Installs into every editor CLI found.
 # Picks the first .vsix in the repo root, or builds one if none exists.
-# Tries `code`, then `code-insiders`, then the well-known install path.
 
 param(
     [string]$VsixPath
@@ -10,16 +10,26 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
-function Find-CodeCli {
-    foreach ($name in @("code", "code-insiders")) {
+function Find-EditorClis {
+    $found = [System.Collections.Generic.List[string]]::new()
+    foreach ($name in @("cursor", "cursor-insiders", "code", "code-insiders")) {
         $cmd = Get-Command $name -ErrorAction SilentlyContinue
-        if ($cmd) { return $cmd.Source }
+        if ($cmd) { $found.Add($cmd.Source) }
     }
-    $fallback = "$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code.cmd"
-    if (Test-Path $fallback) { return $fallback }
-    $fallback = "$env:LOCALAPPDATA\Programs\Microsoft VS Code Insiders\bin\code-insiders.cmd"
-    if (Test-Path $fallback) { return $fallback }
-    throw "Could not find VS Code CLI. Install VS Code or add 'code' to PATH."
+    foreach ($fallback in @(
+        "$env:LOCALAPPDATA\Programs\cursor\resources\app\bin\cursor.cmd",
+        "$env:LOCALAPPDATA\Programs\Cursor\resources\app\bin\cursor.cmd",
+        "$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code.cmd",
+        "$env:LOCALAPPDATA\Programs\Microsoft VS Code Insiders\bin\code-insiders.cmd"
+    )) {
+        if ((Test-Path $fallback) -and -not ($found -contains $fallback)) {
+            $found.Add($fallback)
+        }
+    }
+    if ($found.Count -eq 0) {
+        throw "Could not find Cursor or VS Code CLI. Install Cursor (recommended) or VS Code, or add 'cursor' / 'code' to PATH."
+    }
+    return $found
 }
 
 if (-not $VsixPath) {
@@ -37,8 +47,9 @@ if (-not $VsixPath) {
     $VsixPath = $vsix.FullName
 }
 
-$code = Find-CodeCli
-Write-Host "Installing $VsixPath via $code"
-& $code --install-extension $VsixPath
+foreach ($cli in Find-EditorClis) {
+    Write-Host "Installing $VsixPath via $cli"
+    & $cli --install-extension $VsixPath
+}
 Write-Host ""
-Write-Host "Done. Reload VS Code (Ctrl+Shift+P -> 'Developer: Reload Window') and click the Grok icon."
+Write-Host "Done. Reload the window (Ctrl+Shift+P -> 'Developer: Reload Window') and click the Grok icon."

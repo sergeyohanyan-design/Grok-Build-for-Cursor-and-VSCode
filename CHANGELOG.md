@@ -2,7 +2,15 @@
 
 ## 1.0.5 — 2026-08-16
 
-> Enhanced fork ([sergeyohanyan-design/Grok-Build-GUI](https://github.com/sergeyohanyan-design/Grok-Build-GUI)) of upstream 1.0.4. Marketplace builds still stub voice; this tag is the full local build.
+> Independent product **Grok Build for Cursor and VSCode** (`SergeyOhanyan.grok-build`). Based on [SahilRakhaiya05/Grok-Build-GUI](https://github.com/SahilRakhaiya05/Grok-Build-GUI) 1.0.4 (MIT). Full host — voice included. Built first for Cursor; also runs in VS Code.
+
+### Identity
+
+- Publisher `SergeyOhanyan`, extension id `SergeyOhanyan.grok-build`
+- Display name **Grok Build for Cursor and VSCode**
+- GitHub Releases VSIX: `grok-build-1.0.5.vsix`
+- Open VSX and VS Code Marketplace publish are manual and separate
+- Does not overlay or share an id with `sahilrakhaiya.grok-build-gui`
 
 ### Added
 

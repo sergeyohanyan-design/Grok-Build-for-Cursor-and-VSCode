@@ -1,5 +1,5 @@
-// Package a full-build VSIX for this fork (voice + attach + clipboard).
-// Never use the Marketplace stub path. Does not read workspace .env files.
+// Package a full-build VSIX (voice + attach + clipboard).
+// Marketplace stubs are opt-in via MARKETPLACE_BUNDLE=1. Does not read workspace .env files.
 const { execSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
@@ -32,11 +32,15 @@ if (badPaths.length) {
   process.exit(1);
 }
 
+execSync("node scripts/check-marketplace-readme.cjs", { stdio: "inherit" });
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "grok-fork-vsix-"));
 const zip = path.join(tmp, "extension.zip");
 fs.copyFileSync(vsix, zip);
 execSync(
-  `powershell -NoProfile -Command "Expand-Archive -LiteralPath '${zip}' -DestinationPath '${tmp}' -Force"`,
+  process.platform === "win32"
+    ? `powershell -NoProfile -Command "Expand-Archive -LiteralPath '${zip}' -DestinationPath '${tmp}' -Force"`
+    : `unzip -qo '${zip}' -d '${tmp}'`,
   { stdio: "ignore" },
 );
 
@@ -80,5 +84,5 @@ if (secretHits.length) {
 }
 
 console.log(
-  `Fork VSIX OK: ${vsix} version ${pkg.version} (${listing.split(/\r?\n/).filter(Boolean).length} files)`,
+  `VSIX OK: ${vsix} ${pkg.publisher}.${pkg.name} ${pkg.version} (${listing.split(/\r?\n/).filter(Boolean).length} files)`,
 );

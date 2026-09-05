@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# One-command release for grok-vscode-gui — the macOS/Linux/WSL twin of
-# scripts/release.ps1. Encodes the standing "release push to main" procedure
-# from CLAUDE.md so it isn't orchestrated by hand each time.
+# One-command GitHub Release for Grok Build for Cursor and VSCode — the
+# macOS/Linux/WSL twin of scripts/release.ps1. Encodes the standing
+# "release push to main" procedure from CLAUDE.md so it isn't orchestrated
+# by hand each time.
 #
 # Bump package.json + write the changelog section FIRST (those stay
 # user-initiated), then run:
@@ -13,7 +14,8 @@
 # Steps: assert main -> tsc+test -> assert tag free -> npm run package ->
 #        commit -> push main -> annotated tag -> push tag ->
 #        gh release create (changelog section as notes, .vsix attached).
-# Marketplace publish (vsce) is deliberately separate: npm run publish.
+# Marketplace / Open VSX publish is deliberately separate:
+# npm run publish / npm run publish:ovsx.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

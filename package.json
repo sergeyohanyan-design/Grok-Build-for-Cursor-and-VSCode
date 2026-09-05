@@ -1,11 +1,11 @@
 {
-  "name": "grok-build-gui",
-  "displayName": "Grok Build GUI",
-  "description": "Enhanced Grok Build GUI: VS Code sidebar for the Grok CLI (ACP) with working Windows System.Speech voice, chat copy/paste/undo, screenshot vision, and Windows file-attach fixes. Not affiliated with xAI.",
+  "name": "grok-build",
+  "displayName": "Grok Build for Cursor and VSCode",
+  "description": "Grok Build sidebar for Cursor and VS Code: ACP host with Windows voice, chat copy/paste, screenshot vision, and file attach. Built for Cursor; also runs in VS Code. Not affiliated with xAI.",
   "version": "1.0.5",
-  "publisher": "sahilrakhaiya",
+  "publisher": "SergeyOhanyan",
   "author": {
-    "name": "Sahil Rakhaiya"
+    "name": "Sergey Ohanyan"
   },
   "license": "MIT",
   "homepage": "https://github.com/sergeyohanyan-design/Grok-Build-GUI",
@@ -23,6 +23,9 @@
     "Other"
   ],
   "keywords": [
+    "grok",
+    "cursor",
+    "vscode",
     "agent",
     "sidebar",
     "developer-tools",
@@ -40,14 +43,14 @@
       "activitybar": [
         {
           "id": "grokSidebar",
-          "title": "Grok Build GUI",
+          "title": "Grok Build",
           "icon": "resources/grok-icon.svg"
         }
       ],
       "secondarySideBar": [
         {
           "id": "grokSidebar",
-          "title": "Grok Build GUI",
+          "title": "Grok Build",
           "icon": "resources/grok-icon.svg"
         }
       ]
@@ -57,14 +60,14 @@
         {
           "type": "webview",
           "id": "grok.chat",
-          "name": "Grok Build GUI"
+          "name": "Grok Build"
         }
       ]
     },
     "commands": [
       {
         "command": "grok.open",
-        "title": "Open Grok Build GUI",
+        "title": "Open Grok Build",
         "icon": {
           "light": "resources/grok-icon-dark.svg",
           "dark": "resources/grok-icon-light.svg"
@@ -279,7 +282,7 @@
         "grok.autoOpenSecondarySidebar": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically open Grok in the secondary sidebar (right panel) when VS Code starts."
+          "description": "Automatically open Grok in the secondary sidebar (right panel) when Cursor or VS Code starts."
         },
         "grok.autoUpdateCliOnUpgrade": {
           "type": "boolean",
@@ -335,10 +338,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:live": "tsc -p . && node scripts/live-tests.cjs",
-    "prepackage": "node -e \"for (const f of require('fs').readdirSync('.')) if (f.endsWith('.vsix')) require('fs').unlinkSync(f)\" && node scripts/prepare-marketplace-package.cjs && node scripts/check-marketplace-readme.cjs",
-    "postpackage": "node scripts/restore-marketplace-package.cjs",
-    "package": "node scripts/package-vsix.cjs",
-    "publish": "npx @vscode/vsce publish"
+    "prepackage": "node -e \"for (const f of require('fs').readdirSync('.')) if (f.endsWith('.vsix')) require('fs').unlinkSync(f)\"",
+    "package": "node scripts/package-fork-vsix.cjs",
+    "publish": "npx @vscode/vsce publish",
+    "publish:ovsx": "npx ovsx publish"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

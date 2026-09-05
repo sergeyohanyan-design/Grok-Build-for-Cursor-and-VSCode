@@ -1,6 +1,6 @@
 # Architecture
 
-How the Grok Build VS Code extension is put together, and the one place it
+How Grok Build for Cursor and VSCode is put together, and the one place it
 deliberately stops being "thin." For day-to-day usage see the
 [README](../README.md); for the test layers see [TESTS.md](../TESTS.md).
 

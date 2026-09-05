@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  One-command release for grok-vscode-gui — encodes the standing
+  One-command GitHub Release for Grok Build for Cursor and VSCode — encodes the standing
   "release push to main" procedure from CLAUDE.md so it doesn't have to be
   orchestrated by hand each time.
 
@@ -11,15 +11,15 @@
     1. assert on `main`
     2. tsc --noEmit + npm test       (skip with -NoTest)
     3. assert tag vX.Y.Z is free     (bump the version if it isn't)
-    4. npm run package               -> grok-vscode-gui-X.Y.Z.vsix
+    4. npm run package               -> grok-build-X.Y.Z.vsix
     5. commit the working tree        (message from -MessageFile / -Message / default)
     6. push main
     7. annotated tag vX.Y.Z + push
     8. gh release create vX.Y.Z       with the changelog section as notes
                                        AND the .vsix attached as a release asset
 
-  Marketplace publish (vsce) is deliberately NOT here — that's a separate,
-  explicit step (`npm run publish`).
+  Marketplace / Open VSX publish is deliberately NOT here — that's a separate,
+  explicit step (`npm run publish` / `npm run publish:ovsx`).
 
 .EXAMPLE
   pwsh scripts\release.ps1

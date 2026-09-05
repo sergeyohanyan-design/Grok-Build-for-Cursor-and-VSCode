@@ -11,7 +11,8 @@ describe("isPrimerText (host-side replay detection)", () => {
     expect(isPrimerText("[grok-build-vscode primer v1]\n\nold")).toBe(true);
     expect(isPrimerText("[grok-build-vscode primer v2] whatever")).toBe(true);
     expect(isPrimerText("[grok-build-gui primer v4] legacy")).toBe(true);
-    expect(isPrimerText("[grok-build-gui primer v5] current")).toBe(true);
+    expect(isPrimerText("[grok-build-gui primer v5] legacy")).toBe(true);
+    expect(isPrimerText("[grok-build-gui primer v6] current")).toBe(true);
     expect(isPrimerText("[grok-build-vscode primer v17] some future primer")).toBe(true);
   });
 

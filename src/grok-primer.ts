@@ -11,11 +11,11 @@
 // current when the session started — if we evolve the primer, old sessions
 // keep their old version unless explicitly re-primed.
 
-export const PRIMER_VERSION = 5;
+export const PRIMER_VERSION = 6;
 
 /** Marker prefix on every primer message so we can identify it in session
  *  records and skip rendering it on restore (a future improvement). */
-export const PRIMER_MARKER = "[grok-build-gui primer v5]";
+export const PRIMER_MARKER = "[grok-build-gui primer v6]";
 
 /** Matches the marker prefix of any primer version (v1, v2, …) at the start of
  *  a message. Accepts both legacy `grok-build-vscode` and current
@@ -33,9 +33,9 @@ export const GROK_PRIMER = `${PRIMER_MARKER}
 
 This is a system message. The user cannot see it in the UI. Skip it when discussing previous user messages or summarizing the conversation.
 
-## Grok Build - XAI
+## Grok Build for Cursor and VSCode
 
-This is the Grok Build - XAI extension for VS Code — a graphical sidebar for the Grok Build CLI over the Agent Client Protocol (ACP). It adds Plan Mode enforcement, a polished chat UI, file context, voice input, and session history.
+This is Grok Build for Cursor and VSCode — a graphical sidebar for the Grok Build CLI over the Agent Client Protocol (ACP). It adds Plan Mode enforcement, a polished chat UI, file context, voice input, and session history.
 
 ## Plan Mode
 

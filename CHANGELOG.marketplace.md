@@ -1,16 +1,17 @@
 # Changelog
 
-## 1.0.4 — 2026-06-10
+## 1.0.5 — 2026-08-16
 
-Initial Marketplace release.
+Grok Build for Cursor and VSCode (`SergeyOhanyan.grok-build`).
 
 ### Highlights
 
-- VS Code sidebar for the Grok Build CLI over the Agent Client Protocol
+- Sidebar for the Grok Build CLI over the Agent Client Protocol
 - Plan, Agent, and YOLO modes with edit approvals and session history
 - File context chips, model picker, and reasoning effort controls
+- Windows voice, chat copy/paste, screenshot vision, and file attach
 
 ### Requirements
 
-- VS Code 1.94+
+- Cursor or VS Code 1.94+
 - Grok CLI installed and signed in

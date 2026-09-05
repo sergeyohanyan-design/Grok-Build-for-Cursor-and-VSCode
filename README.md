@@ -1,59 +1,68 @@
-# Grok Build GUI (enhanced fork)
+# Grok Build for Cursor and VSCode
 
-Independent VS Code sidebar for the [Grok Build CLI](https://grok.x.ai/) over the Agent Client Protocol.
-
-This is a **maintained fork** of [SahilRakhaiya05/Grok-Build-GUI](https://github.com/SahilRakhaiya05/Grok-Build-GUI). It keeps the upstream chat, plan mode, and ACP host, and adds the Windows-first improvements that the Marketplace build stubs or overwrites.
+Sidebar for the [Grok Build CLI](https://grok.x.ai/) over the Agent Client Protocol. Built first for **Cursor** (where Grok has no good sidebar). It also runs in VS Code.
 
 **Not affiliated with, endorsed by, or maintained by xAI.**
 
-## Why this fork exists
+Based on [SahilRakhaiya05/Grok-Build-GUI](https://github.com/SahilRakhaiya05/Grok-Build-GUI) (MIT).
 
-The Marketplace VSIX ships a **stubbed voice build** and a chat surface that loses copy/paste and file-attach on Windows. This fork is the full local build (`MARKETPLACE_BUNDLE=0`) with those gaps closed:
+## Why this exists
 
-| Area | What this fork does |
-|------|---------------------|
+Cursor does not ship a Grok Build sidebar. This is a full ACP host — voice, copy/paste, attach, and vision included — published under `SergeyOhanyan.grok-build`. It is not a patch on the upstream Marketplace stub.
+
+| Area | What you get |
+|------|----------------|
 | **Voice** | Windows `System.Speech` STT by default (no API key, no ffmpeg). Optional SAPI TTS after a voice-submitted turn. xAI cloud STT remains as a fallback. |
-| **Chat clipboard** | `Ctrl/Cmd+C V X A Z Y` work in the sidebar. Host `vscode.env.clipboard` bridge + keybindings so the workbench cannot steal the shortcuts. Layout-safe (`e.code`), including non-Latin keyboards. |
+| **Chat clipboard** | `Ctrl/Cmd+C V X A Z Y` work in the sidebar. Host clipboard bridge + keybindings so the workbench cannot steal the shortcuts. Layout-safe (`e.code`), including non-Latin keyboards. |
 | **Attach / paste** | File picker selects **files** (not folders-only). Drag-drop normalizes `/C:/…` paths. Path-less drops and `Ctrl+V` screenshots become temp chips. |
 | **Vision** | Image chips go out as ACP `{ type: "image", mimeType, data }` blocks, not `@path` only. |
 | **Scroll** | After tool rounds, new agent text opens **below** the tool group so the latest work stays visible. |
 
-Upstream Marketplace packaging still strips voice on purpose. Install this repo from source if you want the features above.
-
 ## Requirements
 
-- VS Code 1.94+ (Cursor works the same way)
+- Cursor  (recommended) or VS Code 1.94+
 - [Grok CLI](https://grok.x.ai/) installed and signed in (`grok /login`)
 - Windows Desktop speech recognizer for the default voice engine (e.g. `MS-1033-80-DESK`)
 
 ## Features
 
-Upstream:
-
 - Agent chat sidebar with plan, agent, and YOLO modes
 - File context, session history, and edit approvals
 - Model picker and reasoning effort controls
-
-Added in this fork:
-
 - Windows system voice input and optional reply TTS
 - Hands-free submit phrase (default `grok send`)
 - Chat copy / paste / cut / select-all / undo / redo
 - Screenshot and file paste, drag-drop, and ACP vision
-- Windows file-picker and path-normalization fixes
-- Tool-round scroll that keeps the latest agent work on screen
 
 ## Install
 
-Do **not** expect these patches from the Marketplace listing.
+Extension id: `SergeyOhanyan.grok-build`
+
+### Cursor (recommended)
+
+Search **Grok Build for Cursor and VSCode** in Cursor’s Extensions panel, or:
+
+```
+cursor --install-extension SergeyOhanyan.grok-build
+```
+
+Cursor (and VSCodium / Windsurf) pull from [Open VSX](https://open-vsx.org/extension/SergeyOhanyan/grok-build).
+
+### VS Code
+
+```
+code --install-extension SergeyOhanyan.grok-build
+```
+
+[VS Code Marketplace listing](https://marketplace.visualstudio.com/items?itemName=SergeyOhanyan.grok-build)
 
 ### From a GitHub Release (VSIX)
 
-1. Download `grok-build-gui-1.0.5.vsix` from [Releases](https://github.com/sergeyohanyan-design/Grok-Build-GUI/releases).
-2. In VS Code or Cursor: **Extensions → … → Install from VSIX…**
+1. Download `grok-build-1.0.5.vsix` from [Releases](https://github.com/sergeyohanyan-design/Grok-Build-GUI/releases).
+2. In Cursor or VS Code: **Extensions → … → Install from VSIX…**
 3. Reload the window.
 
-This fork’s VSIX is a **full build** (voice included). Version **1.0.5** is the first enhanced release on top of upstream 1.0.4.
+A hand-installed `.vsix` does not auto-update. Install from Open VSX / Marketplace when you want updates.
 
 ### From source
 
@@ -61,21 +70,13 @@ This fork’s VSIX is a **full build** (voice included). Version **1.0.5** is th
 git clone https://github.com/sergeyohanyan-design/Grok-Build-GUI.git
 cd Grok-Build-GUI
 npm.cmd install
-npm.cmd run bundle:dev
+npm.cmd run package
+cursor --install-extension grok-build-1.0.5.vsix
 ```
 
-Then copy the built host into the installed extension folder (adjust the version folder if needed):
+Or `pwsh scripts\install.ps1` — it prefers the Cursor CLI, then VS Code.
 
-```bat
-copy /Y dist\extension.js %USERPROFILE%\.vscode\extensions\sahilrakhaiya.grok-build-gui-1.0.4\dist\extension.js
-copy /Y media\chat.js     %USERPROFILE%\.vscode\extensions\sahilrakhaiya.grok-build-gui-1.0.4\media\chat.js
-```
-
-If you also use Cursor, copy the same two files into:
-
-`%USERPROFILE%\.cursor\extensions\sahilrakhaiya.grok-build-gui-1.0.4\`
-
-Reload the window: **Developer: Reload Window**.
+Reload: **Developer: Reload Window**.
 
 ## Voice
 
@@ -114,18 +115,17 @@ Soft caps: about 12 MB per vision encode, about 25 MB per temp attach.
 ```bat
 npm.cmd test
 npm.cmd run bundle:dev
-npm.cmd run package:fork
+npm.cmd run package
 ```
 
-This fork defaults to a **full** host bundle. Set `MARKETPLACE_BUNDLE=1` only if you intentionally want the stubbed Marketplace scanner build.
+`npm run package` ships the **full** host (voice included). Set `MARKETPLACE_BUNDLE=1` only if you intentionally want the stubbed scanner build.
+
+GitHub Releases are the VSIX ship path (`pwsh scripts\release.ps1` after a version bump). Open VSX (`npm run publish:ovsx`) and the VS Code Marketplace (`npm run publish`) are manual and separate.
 
 ## Support
 
-- This fork: https://github.com/sergeyohanyan-design/Grok-Build-GUI
-- Upstream: https://github.com/SahilRakhaiya05/Grok-Build-GUI
+https://github.com/sergeyohanyan-design/Grok-Build-GUI
 
 ## License
 
-MIT — Copyright (c) 2026 Sahil Rakhaiya
-
-This fork keeps the original license and attribution. Local enhancements in this repository are also MIT.
+MIT — Copyright (c) 2026 Sahil Rakhaiya and Sergey Ohanyan

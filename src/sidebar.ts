@@ -2476,7 +2476,7 @@ See design doc for the full rollout diagram.`;
   <header class="top-bar">
     <div class="top-brand">
       <span class="top-mark grok-mark-wrap">${grokMarkSvg}</span>
-      <span class="top-brand-text">Grok Build - XAI</span>
+      <span class="top-brand-text">Grok Build</span>
     </div>
     <div class="top-model-wrap">
       <button id="model-btn" class="toolbar-btn top-model-btn" type="button" title="Select model">
@@ -2507,7 +2507,7 @@ See design doc for the full rollout diagram.`;
         <div class="welcome-loader-ring"></div>
         <span class="welcome-mark grok-mark-wrap">${grokMarkSvg}</span>
       </div>
-      <h2>Grok Build - XAI</h2>
+      <h2>Grok Build</h2>
       <p class="welcome-byline muted">Plan · Build · Ship</p>
       <p id="welcome-version" class="welcome-status muted loading-dots" hidden>Starting</p>
       <div id="welcome-onboarding"></div>
@@ -2536,7 +2536,7 @@ See design doc for the full rollout diagram.`;
     </div>
     <div class="composer-input-wrap">
       <div id="input-highlight" class="input-highlight" aria-hidden="true"></div>
-      <textarea id="input" placeholder="Ask Grok Build - XAI anything…" rows="2"></textarea>
+      <textarea id="input" placeholder="Ask Grok Build anything…" rows="2"></textarea>
       <button id="action-btn" class="action-btn mic-mode" type="button" title="Voice input"></button>
     </div>
     <button id="upload-btn" type="button" hidden aria-hidden="true" tabindex="-1"></button>

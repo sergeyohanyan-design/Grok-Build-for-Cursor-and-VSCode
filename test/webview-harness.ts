@@ -20,7 +20,7 @@ const chatSrc = read("../media/chat.js");
 // Mirror of getHtml()'s <body> — only the ids chat.js queries at startup matter.
 export const BODY = `
   <header class="top-bar">
-    <div class="top-brand"><span class="top-brand-text">Grok Build - XAI</span></div>
+    <div class="top-brand"><span class="top-brand-text">Grok Build</span></div>
     <div class="top-model-wrap">
       <button id="model-btn" class="top-model-btn">
         <span id="model-label"></span>
@@ -38,7 +38,7 @@ export const BODY = `
       <div class="welcome-loader-wrap" id="welcome-loader">
         <span class="welcome-mark grok-mark-wrap"><svg class="grok-mark-svg" viewBox="0 0 24 24"><path d="M15.4541 4.29785L10.4541 20.2979L8.5459 19.7021L13.5459 3.70215L15.4541 4.29785Z" fill="currentColor"/></svg></span>
       </div>
-      <h2>Grok Build - XAI</h2>
+      <h2>Grok Build</h2>
       <p class="welcome-byline muted">Plan · Build · Ship</p>
       <p id="welcome-version" class="loading-dots">Starting</p>
       <div id="welcome-onboarding"></div>
