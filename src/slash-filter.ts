@@ -21,6 +21,15 @@ export function filterCommands(commands: SlashCmd[], query: string): SlashCmd[] 
   return commands.filter((c) => c.name.toLowerCase().startsWith(q));
 }
 
+/**
+ * True when the whole prompt is a grok slash command (`/compact`, `/imagine …`).
+ * grok only intercepts these when the ACP text block *starts* with `/name`.
+ * Windows paths like `/C:/Users/…` are not commands.
+ */
+export function isSlashCommandText(text: string): boolean {
+  return /^\/[A-Za-z][\w-]*(?::[\w-]+)?(?:\s|$)/.test(text.trim());
+}
+
 /** Replace the partial `/q` token with `/<name> ` and return the new text + caret. */
 export function applySlashPick(
   text: string,

@@ -22,6 +22,7 @@ import {
   toggleChip,
 } from "./chips";
 import { buildPromptBlocks } from "./prompt-builder";
+import { isSlashCommandText } from "./slash-filter";
 import { mimeToImageExt, normalizeAttachPath, parseFileRef, shouldReadFileInline } from "./file-ref";
 import { pickRejectOption, shouldRejectPermission } from "./plan-gate";
 import { appendPlanEntry, decideRestoreState } from "./plan-restore";
@@ -311,6 +312,12 @@ export class GrokSidebar implements vscode.WebviewViewProvider {
   newSession(): void {
     this.sessionBootstrapped = false;
     void this.startSession();
+  }
+
+  /** Send `/compact` with no file chips so grok intercepts the builtin. */
+  compactConversation(): void {
+    this.reveal();
+    void this.handleSend("/compact", []);
   }
 
   async pickModel(): Promise<void> {
@@ -2285,8 +2292,12 @@ See design doc for the full rollout diagram.`;
     try {
       // First real send of a fresh session: slip the hidden primer in as its own
       // turn first (no-op once primed / on a restored, already-primed session).
-      await this.ensurePrimed(client, gen);
-      if (gen !== this.sessionGen) return;
+      // Slash builtins (`/compact`, `/context`, …) must stay the entire prompt
+      // or grok will not intercept them — don't inject the primer ahead.
+      if (!isSlashCommandText(text)) {
+        await this.ensurePrimed(client, gen);
+        if (gen !== this.sessionGen) return;
+      }
       const meta = await client.prompt(blocks);
       if (gen !== this.sessionGen) return; // session was switched mid-turn
       // Skip agentEnd if a verdict was clicked mid-turn (afterTurn is queued).

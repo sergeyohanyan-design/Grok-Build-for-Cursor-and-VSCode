@@ -64,6 +64,11 @@ describe("buildPrompt", () => {
     expect(buildPrompt("q", [chip], deps)).toBe("@missing.ts\n\nq");
   });
 
+  it("does not prefix file chips onto a slash command", () => {
+    const out = buildPrompt("/compact", [makeImplicitChip("/a.ts", "src/a.ts")], deps);
+    expect(out).toBe("/compact");
+  });
+
   it("combines multiple chips", () => {
     const a = makeImplicitChip("/a.ts", "a.ts");
     const b = makeExplicitChip("/b.ts", "b.ts", 1, 2);
@@ -130,6 +135,19 @@ describe("buildPromptBlocks (vision)", () => {
     expect(warnings[0]).toMatch(/too large/);
     expect(blocks).toHaveLength(1);
     expect(blocks[0]).toEqual({ type: "text", text: "@huge.png\n\nq" });
+  });
+
+  it("keeps slash-command text leading so grok can intercept it", () => {
+    const code = makeImplicitChip("/a.ts", "src/a.ts");
+    const img = makeExplicitChip("/shot.png", "shot.png");
+    const { blocks, imageCount } = buildPromptBlocks("/compact", [code], blockDeps);
+    expect(imageCount).toBe(0);
+    expect(blocks).toEqual([{ type: "text", text: "/compact" }]);
+
+    const imagine = buildPromptBlocks("/imagine make it darker", [img], blockDeps);
+    expect(imagine.imageCount).toBe(1);
+    expect(imagine.blocks[0]?.type).toBe("image");
+    expect(imagine.blocks[1]).toEqual({ type: "text", text: "/imagine make it darker" });
   });
 
   it("text-only chips produce a single text block", () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applySlashPick, filterCommands, getSlashQuery } from "../src/slash-filter";
+import { applySlashPick, filterCommands, getSlashQuery, isSlashCommandText } from "../src/slash-filter";
 
 describe("getSlashQuery", () => {
   it("returns null when no slash at line start", () => {
@@ -52,6 +52,24 @@ describe("filterCommands", () => {
 
   it("returns empty when no matches", () => {
     expect(filterCommands(cmds, "zzz")).toEqual([]);
+  });
+});
+
+describe("isSlashCommandText", () => {
+  it("matches builtins and skills with optional args", () => {
+    expect(isSlashCommandText("/compact")).toBe(true);
+    expect(isSlashCommandText("  /compact  ")).toBe(true);
+    expect(isSlashCommandText("/compact keep the auth")).toBe(true);
+    expect(isSlashCommandText("/session-info")).toBe(true);
+    expect(isSlashCommandText("/imagine a cat")).toBe(true);
+    expect(isSlashCommandText("/user:commit")).toBe(true);
+  });
+
+  it("rejects normal prompts and Windows paths", () => {
+    expect(isSlashCommandText("compact")).toBe(false);
+    expect(isSlashCommandText("please /compact this")).toBe(false);
+    expect(isSlashCommandText("/C:/Users/me/file.ts")).toBe(false);
+    expect(isSlashCommandText("")).toBe(false);
   });
 });
 

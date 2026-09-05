@@ -43,9 +43,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("grok.open", () => openGrokPanel(sidebar)),
     vscode.commands.registerCommand("grok.newSession", () => sidebar.newSession()),
     vscode.commands.registerCommand("grok.compact", () => {
-      vscode.window.showInformationMessage(
-        "Type /compact in the composer to compress the conversation.",
-      );
+      void openGrokPanel(sidebar);
+      sidebar.compactConversation();
     }),
     vscode.commands.registerCommand("grok.pickModel", () => sidebar.openModelPopover()),
     vscode.commands.registerCommand("grok.toggleMode", () => sidebar.openModePopover()),

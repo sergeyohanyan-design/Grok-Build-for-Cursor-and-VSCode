@@ -1,4 +1,5 @@
 import type { FileChip } from "./chips";
+import { isSlashCommandText } from "./slash-filter";
 
 export interface PromptBuilderDeps {
   readFile: (path: string) => string;
@@ -89,6 +90,7 @@ export function buildPrompt(
       refs.push(`@${chip.relPath}`);
     }
   }
+  if (isSlashCommandText(text)) return text.trim();
   return [refs.join("\n\n"), text].filter(Boolean).join("\n\n");
 }
 
@@ -178,7 +180,11 @@ export function buildPromptBlocks(
     }
   }
 
-  const textBody = [refs.join("\n\n"), text].filter(Boolean).join("\n\n");
+  // grok intercepts `/compact` (and other builtins) only when the text block
+  // starts with the command. Prefixing @refs would send a normal prompt instead.
+  const textBody = isSlashCommandText(text)
+    ? text.trim()
+    : [refs.join("\n\n"), text].filter(Boolean).join("\n\n");
   const blocks: PromptContentBlock[] = [...images];
   if (textBody) {
     blocks.push({ type: "text", text: textBody });
