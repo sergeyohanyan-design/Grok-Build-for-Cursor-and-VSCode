@@ -2,7 +2,7 @@
 
 How Grok Build for Cursor and VSCode is put together, and the one place it
 deliberately stops being "thin." For day-to-day usage see the
-[README](../README.md); for the test layers see [TESTS.md](../TESTS.md).
+[README](../README.md). Tests live in `test/` (`npm test`).
 
 ## The thin-client boundary
 
@@ -86,8 +86,7 @@ the extension can't trust the wire verdict. Two mechanisms cover the gap:
   is hidden and not counted toward plan positions — but that detection does
   **not** mark the session primed.
 
-The full pedagogical write-up lives in
-[research/understanding-plan-mode.md](../research/understanding-plan-mode.md).
+Plan-mode policy lives in `src/plan-gate.ts` and `src/grok-primer.ts`.
 
 ## Module map
 
@@ -119,8 +118,7 @@ The full pedagogical write-up lives in
 - **Pure modules split for testability.** Everything tagged "(pure)" above has no
   `vscode` import, no process spawn, no network — it runs under Vitest in a plain
   Node process. That's *why* the bulk of protocol behavior can be regression-
-  tested without launching VS Code or the `grok` binary. See
-  [TESTS.md](../TESTS.md).
+  tested without launching VS Code or the `grok` binary (`npm test`).
 - **YOLO is client-side only.** A single `autoApprove` flag — toggling Agent ↔
   YOLO doesn't restart the CLI or even send a message. When the CLI raises a
   permission request, the extension just answers "allow always" automatically.
@@ -138,5 +136,4 @@ The full pedagogical write-up lives in
   `/imagine-video` write a file into the session dir and report its *path* as
   JSON-in-text on the completed tool result. The host parses the path, classifies
   image-vs-video by extension, and serves it to the webview via `asWebviewUri`
-  (streamed from disk) so even a multi-MB video renders. See
-  [research/image-generation.md](../research/image-generation.md).
+  (streamed from disk) so even a multi-MB video renders.

@@ -31,7 +31,7 @@ Present in subscription mode, not on API-key auth.
 | `/imagine` | Generate an image from a text description (also edits a reference photo) |
 | `/imagine-video` | Generate a video from a text description |
 
-Since v1.4.0 the extension **renders the result inline** — `/imagine` output shows as an image (click to open the source file), `/imagine-video` as a playable `<video>`. Grok writes the file into its session directory and the extension serves it to the webview via `asWebviewUri` (streamed from disk; a base64 `data:` URI is used only as a fallback for files outside grok's served roots). Inline media is capped at 320px, and hovering an image/video reveals **Copy path** / **Open in VS Code** actions pinned to the media. When `/imagine` is given a source image to edit, grok runs an `image_edit` tool call, which the extension detects and renders the same way. See [research/image-generation.md](../research/image-generation.md) for the wire format.
+Since v1.4.0 the extension **renders the result inline** — `/imagine` output shows as an image (click to open the source file), `/imagine-video` as a playable `<video>`. Grok writes the file into its session directory and the extension serves it to the webview via `asWebviewUri` (streamed from disk; a base64 `data:` URI is used only as a fallback for files outside grok's served roots). Inline media is capped at 320px, and hovering an image/video reveals **Copy path** / **Open in VS Code** actions pinned to the media. When `/imagine` is given a source image to edit, grok runs an `image_edit` tool call, which the extension detects and renders the same way.
 
 ## Not slash commands
 

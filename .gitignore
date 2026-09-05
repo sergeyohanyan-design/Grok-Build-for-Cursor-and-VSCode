@@ -1,3 +1,21 @@
+# Agent / editor state — local only
+.claude/
+.grok/
+.cursor/
+.agents/
+.idea/
+AGENTS.md
+CLAUDE.md
+Claude.md
+TESTS.md
+
+# Private probes, logs, and MCP dumps
+research/
+mcps/
+scripts/test-acp.cjs
+docs/screenshots/archive/
+
+# Build artifacts
 node_modules/
 out/
 dist/
@@ -5,6 +23,7 @@ dist/
 !releases/*.vsix
 .vscode-test/
 .DS_Store
+Thumbs.db
 .env
 Screenshot*.png
 agent-tools/
