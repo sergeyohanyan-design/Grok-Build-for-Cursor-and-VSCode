@@ -28,8 +28,8 @@ Configure `grok.cliPath` if the CLI is not on your PATH.
 
 ## Support
 
-- Repository: https://github.com/sergeyohanyan-design/Grok-Build-GUI
-- Issues: https://github.com/sergeyohanyan-design/Grok-Build-GUI/issues
+- Repository: https://github.com/sergeyohanyan-design/Grok-Build-for-Cursor-and-VSCode
+- Issues: https://github.com/sergeyohanyan-design/Grok-Build-for-Cursor-and-VSCode/issues
 
 ## License
 

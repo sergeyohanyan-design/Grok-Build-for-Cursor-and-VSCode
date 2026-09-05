@@ -8,13 +8,13 @@
     "name": "Sergey Ohanyan"
   },
   "license": "MIT",
-  "homepage": "https://github.com/sergeyohanyan-design/Grok-Build-GUI",
+  "homepage": "https://github.com/sergeyohanyan-design/Grok-Build-for-Cursor-and-VSCode",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sergeyohanyan-design/Grok-Build-GUI.git"
+    "url": "https://github.com/sergeyohanyan-design/Grok-Build-for-Cursor-and-VSCode.git"
   },
   "bugs": {
-    "url": "https://github.com/sergeyohanyan-design/Grok-Build-GUI/issues"
+    "url": "https://github.com/sergeyohanyan-design/Grok-Build-for-Cursor-and-VSCode/issues"
   },
   "engines": {
     "vscode": "^1.94.0"
