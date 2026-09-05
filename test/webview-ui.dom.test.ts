@@ -340,6 +340,31 @@ describe("agent pending indicator (no blank gap after send)", () => {
   });
 });
 
+describe("slash command composer", () => {
+  it("Enter on a slash pick sends the command without waiting for a second keypress", () => {
+    const { window, posted, doc } = bootWebview();
+    dispatch(window, {
+      type: "commandsUpdate",
+      commands: [
+        { name: "compact", description: "Compress conversation" },
+        { name: "context", description: "Show context" },
+      ],
+    });
+    const input = $(doc, "input") as HTMLTextAreaElement;
+    input.value = "/com";
+    input.selectionStart = input.selectionEnd = 4;
+    input.dispatchEvent(new (window as any).Event("input", { bubbles: true }));
+    input.dispatchEvent(new (window as any).KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    }));
+    const send = posted.find((p) => p.type === "send");
+    expect(send).toBeTruthy();
+    expect((send as { text?: string }).text).toBe("/compact");
+  });
+});
+
 describe("new session welcome restore", () => {
   it("shows the welcome icon again after new session", () => {
     const { window, doc } = bootWebview();

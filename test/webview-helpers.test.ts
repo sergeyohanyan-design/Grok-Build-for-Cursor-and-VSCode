@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error — plain JS module, no types
-import { looksLikeFileRef, formatRelativeTime, FILE_EXTS, modelDisplayName, nextMicState, trailingSendPhrase, buildQuestionAnswers, isSubagentToolCall, subagentLabel } from "../media/webview-helpers.js";
+import { looksLikeFileRef, formatRelativeTime, FILE_EXTS, modelDisplayName, nextMicState, trailingSendPhrase, buildQuestionAnswers, isSubagentToolCall, subagentLabel, isScrolledToBottom } from "../media/webview-helpers.js";
 
 describe("looksLikeFileRef", () => {
   it("accepts a bare filename with a known extension", () => {
@@ -317,5 +317,17 @@ describe("subagentLabel", () => {
     expect(subagentLabel({ tool: "task" })).toBe("Subagent");
     expect(subagentLabel({ rawInput: { is_background: true } })).toBe("background task");
     expect(subagentLabel(null)).toBe("Subagent");
+  });
+});
+
+describe("isScrolledToBottom", () => {
+  it("is true at or near the bottom", () => {
+    expect(isScrolledToBottom(952, 1000, 40)).toBe(true);
+    expect(isScrolledToBottom(960, 1000, 40)).toBe(true);
+  });
+
+  it("is false when the user has scrolled up", () => {
+    expect(isScrolledToBottom(200, 1000, 40)).toBe(false);
+    expect(isScrolledToBottom(0, 1000, 40)).toBe(false);
   });
 });

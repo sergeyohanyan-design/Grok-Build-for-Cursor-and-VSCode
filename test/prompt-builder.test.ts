@@ -148,6 +148,10 @@ describe("buildPromptBlocks (vision)", () => {
     expect(imagine.imageCount).toBe(1);
     expect(imagine.blocks[0]?.type).toBe("image");
     expect(imagine.blocks[1]).toEqual({ type: "text", text: "/imagine make it darker" });
+
+    const compactWithPhoto = buildPromptBlocks("/compact", [img], blockDeps);
+    expect(compactWithPhoto.imageCount).toBe(0);
+    expect(compactWithPhoto.blocks).toEqual([{ type: "text", text: "/compact" }]);
   });
 
   it("text-only chips produce a single text block", () => {

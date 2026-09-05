@@ -16,7 +16,7 @@ Cursor does not ship a Grok Build sidebar. This is a full ACP host — voice, co
 | **Chat clipboard** | `Ctrl/Cmd+C V X A Z Y` work in the sidebar. Host clipboard bridge + keybindings so the workbench cannot steal the shortcuts. Layout-safe (`e.code`), including non-Latin keyboards. |
 | **Attach / paste** | File picker selects **files** (not folders-only). Drag-drop normalizes `/C:/…` paths. Path-less drops and `Ctrl+V` screenshots become temp chips. |
 | **Vision** | Image chips go out as ACP `{ type: "image", mimeType, data }` blocks, not `@path` only. |
-| **Scroll** | After tool rounds, new agent text opens **below** the tool group so the latest work stays visible. |
+| **Scroll** | After tool rounds, new agent text opens **below** the tool group. Auto-scroll follows only while you are at the bottom — scroll up to read, scroll back down to catch up. |
 
 ## Requirements
 
@@ -58,7 +58,7 @@ code --install-extension SergeyOhanyan.grok-build
 
 ### From a GitHub Release (VSIX)
 
-1. Download `grok-build-1.0.5.vsix` from [Releases](https://github.com/sergeyohanyan-design/Grok-Build-for-Cursor-and-VSCode/releases).
+1. Download `grok-build-1.0.6.vsix` from [Releases](https://github.com/sergeyohanyan-design/Grok-Build-for-Cursor-and-VSCode/releases).
 2. In Cursor or VS Code: **Extensions → … → Install from VSIX…**
 3. Reload the window.
 
@@ -71,7 +71,7 @@ git clone https://github.com/sergeyohanyan-design/Grok-Build-for-Cursor-and-VSCo
 cd "Grok Build for Cursor and VSCode"
 npm.cmd install
 npm.cmd run package
-cursor --install-extension grok-build-1.0.5.vsix
+cursor --install-extension grok-build-1.0.6.vsix
 ```
 
 Or `pwsh scripts\install.ps1` — it prefers the Cursor CLI, then VS Code.

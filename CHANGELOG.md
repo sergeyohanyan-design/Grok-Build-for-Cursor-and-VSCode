@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.6 — 2026-09-06
+
+> Slash commands actually run, chat scroll no longer fights you, Node 24 tests collect.
+
+### Fixed
+
+- Slash commands grok advertises over ACP (`/compact`, `/context`, `/session-info`, `/imagine`, skills, …) are sent as the **whole prompt**. The active-file chip no longer wraps `/compact` into a normal chat turn, so grok intercepts the builtin. Command Palette **Grok: Compact Conversation** sends `/compact` instead of a toast. Enter on a slash pick runs it; Tab still completes so you can add args. `/imagine` can still attach a reference photo.
+- Chat auto-scroll follows new output **only while you are at the bottom**. Scroll up to read earlier messages while Grok works; scroll back down to catch up.
+- `npm test` on Node 24: vitest uses the forks pool so suites collect (was "No test suite found" in every file).
+
+### GitHub Releases VSIX
+
+- `grok-build-1.0.6.vsix`
+
 ## 1.0.5 — 2026-08-16
 
 > Independent product **Grok Build for Cursor and VSCode** (`SergeyOhanyan.grok-build`). Based on [SahilRakhaiya05/Grok-Build-GUI](https://github.com/SahilRakhaiya05/Grok-Build-GUI) 1.0.4 (MIT). Full host — voice included. Built first for Cursor; also runs in VS Code.

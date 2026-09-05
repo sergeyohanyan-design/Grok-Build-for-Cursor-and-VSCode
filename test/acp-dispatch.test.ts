@@ -126,6 +126,17 @@ describe("routeSessionUpdate", () => {
     if (r?.event === "commandsUpdate") expect(r.commands).toHaveLength(1);
   });
 
+  it("strips a leading slash from advertised command names", () => {
+    const r = routeSessionUpdate({
+      sessionUpdate: "available_commands_update",
+      availableCommands: [{ name: "/compact" }, { name: "context" }],
+    });
+    expect(r?.event).toBe("commandsUpdate");
+    if (r?.event === "commandsUpdate") {
+      expect(r.commands.map((c: { name: string }) => c.name)).toEqual(["compact", "context"]);
+    }
+  });
+
   it("routes plan update and passes full payload", () => {
     const payload = { sessionUpdate: "plan", planContent: "Step 1\nStep 2", planFilePath: "/tmp/plan.md" };
     const r = routeSessionUpdate(payload);

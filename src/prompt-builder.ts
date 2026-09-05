@@ -1,5 +1,5 @@
 import type { FileChip } from "./chips";
-import { isSlashCommandText } from "./slash-filter";
+import { isSlashCommandText, slashCommandAllowsImages } from "./slash-filter";
 
 export interface PromptBuilderDeps {
   readFile: (path: string) => string;
@@ -115,6 +115,13 @@ export function buildPromptBlocks(
   chips: FileChip[],
   deps: PromptBlocksDeps,
 ): BuildPromptBlocksResult {
+  // grok intercepts `/compact` (and other builtins) only when the prompt is
+  // exactly the command. File chips and image blocks would turn it into a
+  // normal model turn. `/imagine` is the exception — it may include a photo.
+  if (isSlashCommandText(text) && !slashCommandAllowsImages(text)) {
+    return { blocks: [{ type: "text", text: text.trim() }], imageCount: 0, warnings: [] };
+  }
+
   const images: PromptContentBlock[] = [];
   const refs: string[] = [];
   const warnings: string[] = [];

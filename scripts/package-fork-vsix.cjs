@@ -37,12 +37,9 @@ execSync("node scripts/check-marketplace-readme.cjs", { stdio: "inherit" });
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "grok-fork-vsix-"));
 const zip = path.join(tmp, "extension.zip");
 fs.copyFileSync(vsix, zip);
-execSync(
-  process.platform === "win32"
-    ? `powershell -NoProfile -Command "Expand-Archive -LiteralPath '${zip}' -DestinationPath '${tmp}' -Force"`
-    : `unzip -qo '${zip}' -d '${tmp}'`,
-  { stdio: "ignore" },
-);
+// A .vsix is a zip. Expand-Archive is flaky on that rename under nested
+// PowerShell; tar is on Windows 10+ and Unix.
+execSync(`tar -xf ${JSON.stringify(zip)} -C ${JSON.stringify(tmp)}`, { stdio: "ignore" });
 
 const js = fs.readFileSync(path.join(tmp, "extension", "dist", "extension.js"), "utf8");
 const shipped = JSON.parse(fs.readFileSync(path.join(tmp, "extension", "package.json"), "utf8"));

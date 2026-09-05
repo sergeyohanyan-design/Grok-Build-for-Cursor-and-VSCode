@@ -1,3 +1,5 @@
+import { normalizeAvailableCommands } from "./slash-filter";
+
 /**
  * Pure dispatch helpers for the ACP wire protocol.
  *
@@ -231,7 +233,10 @@ export function routeSessionUpdate(u: any): UpdateRoute | null {
     case "current_mode_update":
       return { event: "modeChanged", modeId: u.currentModeId };
     case "available_commands_update":
-      return { event: "commandsUpdate", commands: u.availableCommands ?? [] };
+      return {
+        event: "commandsUpdate",
+        commands: normalizeAvailableCommands(u.availableCommands ?? []),
+      };
     default:
       return { event: "update", payload: u };
   }

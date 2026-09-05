@@ -244,7 +244,7 @@
     return `${h}:${m.toString().padStart(2, "0")} ${ampm}`;
   }
 
-  const { looksLikeFileRef, formatRelativeTime, modelDisplayName, nextMicState, trailingSendPhrase, buildQuestionAnswers, isSubagentToolCall, subagentLabel } = globalThis.GrokWebviewHelpers;
+  const { looksLikeFileRef, formatRelativeTime, modelDisplayName, nextMicState, trailingSendPhrase, buildQuestionAnswers, isSubagentToolCall, subagentLabel, isScrolledToBottom } = globalThis.GrokWebviewHelpers;
 
   function updateModeBtn(modeId) {
     const meta = MODE_META[modeId] || MODE_META.agent;
@@ -1896,11 +1896,24 @@
     state.planProcessingEl = null;
   }
 
+  // Follow new output only while the user is already at the bottom. Scrolling
+  // up to read is sticky until they return to the bottom themselves.
+  let pinToBottom = true;
+  messagesEl.addEventListener("scroll", () => {
+    pinToBottom = isScrolledToBottom(
+      messagesEl.scrollTop,
+      messagesEl.scrollHeight,
+      messagesEl.clientHeight,
+    );
+  }, { passive: true });
+
   function scrollToBottom() {
-    // LOCAL PATCH: double rAF so layout after tools settles before pinning.
+    if (!pinToBottom) return;
     requestAnimationFrame(() => {
+      if (!pinToBottom) return;
       messagesEl.scrollTop = messagesEl.scrollHeight;
       requestAnimationFrame(() => {
+        if (!pinToBottom) return;
         messagesEl.scrollTop = messagesEl.scrollHeight;
       });
     });
@@ -2427,8 +2440,12 @@
   function updateSlash() {
     const m = (input.value.slice(0, input.selectionStart || 0)).match(/(?:^|\n)\/(\S*)$/);
     if (!m) { slashPopover.hidden = true; state.slashFiltered = []; return; }
-    const q = m[1].toLowerCase();
-    state.slashFiltered = state.commands.filter((c) => c.name.toLowerCase().startsWith(q));
+    const q = m[1].toLowerCase().replace(/^\//, "");
+    const cmds = state.commands || [];
+    const prefix = cmds.filter((c) => String(c.name || "").replace(/^\//, "").toLowerCase().startsWith(q));
+    state.slashFiltered = prefix.length
+      ? prefix
+      : cmds.filter((c) => String(c.name || "").replace(/^\//, "").toLowerCase().includes(q));
     if (!state.slashFiltered.length) { slashPopover.hidden = true; return; }
     state.slashActive = 0;
     renderSlash();
@@ -2459,8 +2476,9 @@
   }
 
   function pickSlash(cmd) {
+    const name = String(cmd.name || "").replace(/^\//, "");
     input.value = input.value.replace(/(?:^|\n)\/(\S*)$/, (full) =>
-      full.startsWith("\n") ? `\n/${cmd.name} ` : `/${cmd.name} `,
+      full.startsWith("\n") ? `\n/${name} ` : `/${name} `,
     );
     slashPopover.hidden = true;
     input.focus();
@@ -3190,9 +3208,15 @@
         state.slashActive = (state.slashActive - 1 + state.slashFiltered.length) % state.slashFiltered.length;
         renderSlash(); return;
       }
-      if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+      if (e.key === "Tab") {
         e.preventDefault();
         pickSlash(state.slashFiltered[state.slashActive]); return;
+      }
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        pickSlash(state.slashFiltered[state.slashActive]);
+        sendOrStop();
+        return;
       }
       if (e.key === "Escape") { slashPopover.hidden = true; return; }
     }

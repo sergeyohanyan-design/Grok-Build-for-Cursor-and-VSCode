@@ -160,7 +160,14 @@
     return "Subagent";
   }
 
-  const api = { FILE_EXTS, looksLikeFileRef, formatRelativeTime, modelDisplayName, MIC_STATES, nextMicState, trailingSendPhrase, buildQuestionAnswers, isSubagentToolCall, subagentLabel };
+  // True when the chat is close enough to the bottom that new output should
+  // keep following. Used so scrolling up to read is not yanked back down.
+  function isScrolledToBottom(scrollTop, scrollHeight, clientHeight, threshold) {
+    const slack = threshold == null ? 48 : threshold;
+    return scrollHeight - scrollTop - clientHeight <= slack;
+  }
+
+  const api = { FILE_EXTS, looksLikeFileRef, formatRelativeTime, modelDisplayName, MIC_STATES, nextMicState, trailingSendPhrase, buildQuestionAnswers, isSubagentToolCall, subagentLabel, isScrolledToBottom };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   } else {

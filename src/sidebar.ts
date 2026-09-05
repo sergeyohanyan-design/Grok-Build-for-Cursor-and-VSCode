@@ -22,7 +22,7 @@ import {
   toggleChip,
 } from "./chips";
 import { buildPromptBlocks } from "./prompt-builder";
-import { isSlashCommandText } from "./slash-filter";
+import { isSlashCommandText, slashCommandAllowsImages } from "./slash-filter";
 import { mimeToImageExt, normalizeAttachPath, parseFileRef, shouldReadFileInline } from "./file-ref";
 import { pickRejectOption, shouldRejectPermission } from "./plan-gate";
 import { appendPlanEntry, decideRestoreState } from "./plan-restore";
@@ -2276,13 +2276,19 @@ See design doc for the full rollout diagram.`;
       );
     }
 
-    this.chips = [];
-    this.postChips();
+    const slash = isSlashCommandText(text);
+    const imagineSlash = slashCommandAllowsImages(text);
+    // Non-imagine slash cmds must not ride file chips onto the wire, and they
+    // shouldn't steal the chips the user still wants for the next real prompt.
+    if (!slash || imagineSlash) {
+      this.chips = [];
+      this.postChips();
+    }
 
     const isFirstSend = !this.hasHistory;
     this.hasHistory = true;
-    if (isFirstSend) this.firstUserMessageForTitle = text;
-    const sentChips = chips.filter((c) => !c.hidden);
+    if (isFirstSend && !slash) this.firstUserMessageForTitle = text;
+    const sentChips = !slash || imagineSlash ? chips.filter((c) => !c.hidden) : [];
     this.userMessageCount += 1;
     this.inUserMessage = false; // live send isn't part of the streamed-chunk count path
     this.post({ type: "userMessage", text, chips: sentChips });
@@ -2379,6 +2385,7 @@ See design doc for the full rollout diagram.`;
         models: live.availableModels,
         currentModelId: live.currentModelId,
       });
+      this.post({ type: "commandsUpdate", commands: live.availableCommands });
       this.postChips();
       return;
     }

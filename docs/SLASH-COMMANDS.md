@@ -2,6 +2,8 @@
 
 Slash commands are sourced live from the running CLI via the ACP `available_commands_update` notification — the autocomplete list reflects exactly what your installed `grok` version and auth method expose. Type `/` in the composer to open it.
 
+Type `/` then pick a command: **Tab** completes it so you can add args; **Enter** runs it. The host sends the command as the whole ACP prompt (it does not prefix the active-file chip), which is what grok needs in order to intercept builtins like `/compact`.
+
 This page is a snapshot for reference; the autocomplete list is the source of truth. Skills installed under `~/.grok/skills/` or `~/.grok/bundled/skills/` also appear in autocomplete as `/<skill-name>` but are not documented here — they vary per install and are owned by their respective `SKILL.md` files.
 
 Snapshot last reconciled against a recent `grok` 0.2.x build; the autocomplete list is the source of truth.
