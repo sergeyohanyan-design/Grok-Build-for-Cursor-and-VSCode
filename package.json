@@ -2,7 +2,7 @@
   "name": "grok-build",
   "displayName": "Grok Build for Cursor and VSCode",
   "description": "Grok Build sidebar for Cursor and VS Code: ACP host with Windows voice, chat copy/paste, screenshot vision, and file attach. Built for Cursor; also runs in VS Code. Not affiliated with xAI.",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "publisher": "SergeyOhanyan",
   "author": {
     "name": "Sergey Ohanyan"

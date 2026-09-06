@@ -4,8 +4,8 @@
 # "release push to main" procedure from CLAUDE.md so it isn't orchestrated
 # by hand each time.
 #
-# Bump package.json + write the changelog section FIRST (those stay
-# user-initiated), then run:
+# ALWAYS bump package.json + write the changelog section FIRST.
+# Never publish by overwriting an existing vX.Y.Z. Then run:
 #   ./scripts/release.sh                 # full release
 #   ./scripts/release.sh --no-test       # skip tsc + npm test
 #   ./scripts/release.sh --dry-run       # print what it would do
@@ -50,7 +50,7 @@ if [ "$NO_TEST" -eq 0 ]; then
 fi
 
 if git tag --list "$tag" | grep -q .; then
-  echo "Tag $tag already exists - bump package.json/changelog first." >&2; exit 1
+  echo "Tag $tag already exists - bump package.json/changelog first. Never republish the same version." >&2; exit 1
 fi
 
 step "npm run package"; npm run package

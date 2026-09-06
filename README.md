@@ -58,7 +58,7 @@ code --install-extension SergeyOhanyan.grok-build
 
 ### From a GitHub Release (VSIX)
 
-1. Download `grok-build-1.0.6.vsix` from [Releases](https://github.com/sergeyohanyan-design/Grok-Build-for-Cursor-and-VSCode/releases).
+1. Download `grok-build-1.0.7.vsix` from [Releases](https://github.com/sergeyohanyan-design/Grok-Build-for-Cursor-and-VSCode/releases).
 2. In Cursor or VS Code: **Extensions → … → Install from VSIX…**
 3. Reload the window.
 
@@ -71,7 +71,7 @@ git clone https://github.com/sergeyohanyan-design/Grok-Build-for-Cursor-and-VSCo
 cd "Grok Build for Cursor and VSCode"
 npm.cmd install
 npm.cmd run package
-cursor --install-extension grok-build-1.0.6.vsix
+cursor --install-extension grok-build-1.0.7.vsix
 ```
 
 Or `pwsh scripts\install.ps1` — it prefers the Cursor CLI, then VS Code.

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.7 — 2026-09-06
+
+> App icon: original Grok mark inside build brackets.
+
+### Changed
+
+- Marketplace, activity bar, and in-chat mark now use the original Grok glyph framed by construction brackets, with the mark large in the center.
+
+### Release
+
+- Always bump the version before publishing. Never replace an existing `vX.Y.Z` VSIX in place.
+- GitHub Releases VSIX: `grok-build-1.0.7.vsix`
+
 ## 1.0.6 — 2026-09-06
 
 > Slash commands actually run, chat scroll no longer fights you, Node 24 tests collect.

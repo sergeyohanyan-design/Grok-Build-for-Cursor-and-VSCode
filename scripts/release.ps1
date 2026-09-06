@@ -5,8 +5,9 @@
   orchestrated by hand each time.
 
 .DESCRIPTION
-  Reads the version from package.json (bump it + write the changelog section
-  FIRST — those stay user-initiated), then runs the gate and ships:
+  Reads the version from package.json (ALWAYS bump it + write the changelog
+  section FIRST — never publish by overwriting an existing vX.Y.Z), then runs
+  the gate and ships:
 
     1. assert on `main`
     2. tsc --noEmit + npm test       (skip with -NoTest)
@@ -64,8 +65,8 @@ if (-not $NoTest) {
   Run "npm test"      { npm test }
 }
 
-# 3. tag must be free (a collision means the version wasn't bumped)
-if (git tag --list $tag) { throw "Tag $tag already exists - bump package.json/changelog first." }
+# 3. tag must be free — always bump before publishing; never clobber an existing version
+if (git tag --list $tag) { throw "Tag $tag already exists - bump package.json/changelog first. Never republish the same version." }
 
 # 4. build the vsix that will be attached to the release
 $vsix = "$name-$version.vsix"
