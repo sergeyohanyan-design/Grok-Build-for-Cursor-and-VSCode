@@ -36,7 +36,7 @@ export const BODY = `
   <main id="messages" class="messages">
     <div class="welcome" id="welcome">
       <div class="welcome-loader-wrap" id="welcome-loader">
-        <span class="welcome-mark grok-mark-wrap"><svg class="grok-mark-svg" viewBox="0 0 24 24"><path d="M15.4541 4.29785L10.4541 20.2979L8.5459 19.7021L13.5459 3.70215L15.4541 4.29785Z" fill="currentColor"/></svg></span>
+        <span class="welcome-mark grok-mark-wrap"><svg class="grok-mark-svg" viewBox="0 0 24 24" fill="none"><path d="M17.05 7.35a6.45 6.45 0 1 0 .15 8.4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M11.15 12.15h7.05v3.45" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       </div>
       <h2>Grok Build</h2>
       <p class="welcome-byline muted">Plan · Build · Ship</p>

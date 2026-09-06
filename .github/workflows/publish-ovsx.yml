@@ -1,0 +1,51 @@
+name: Publish Open VSX
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (empty = latest GitHub Release)"
+        required: false
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Download VSIX from GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -n "${EVENT_TAG}" ]; then
+            TAG="${EVENT_TAG}"
+          elif [ -n "${INPUT_TAG}" ]; then
+            TAG="${INPUT_TAG}"
+          else
+            TAG="$(gh release view --json tagName -q .tagName)"
+          fi
+          echo "Publishing ${TAG}"
+          gh release download "${TAG}" --pattern "*.vsix"
+          ls -l ./*.vsix
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OVSX_PAT}" ]; then
+            echo "OVSX_PAT secret is missing"
+            exit 1
+          fi
+          npx --yes ovsx publish ./*.vsix --pat "${OVSX_PAT}"
