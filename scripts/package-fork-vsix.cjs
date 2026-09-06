@@ -2,8 +2,8 @@
 // Marketplace stubs are opt-in via MARKETPLACE_BUNDLE=1. Does not read workspace .env files.
 const { execSync } = require("child_process");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+const { readVsixText } = require("./vsix-zip.cjs");
 
 const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
 const vsix = `${pkg.name}-${pkg.version}.vsix`;
@@ -34,16 +34,14 @@ if (badPaths.length) {
 
 execSync("node scripts/check-marketplace-readme.cjs", { stdio: "inherit" });
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "grok-fork-vsix-"));
-const zip = path.join(tmp, "extension.zip");
-fs.copyFileSync(vsix, zip);
-// A .vsix is a zip. Expand-Archive is flaky on that rename under nested
-// PowerShell; tar is on Windows 10+ and Unix.
-execSync(`tar -xf ${JSON.stringify(zip)} -C ${JSON.stringify(tmp)}`, { stdio: "ignore" });
-
-const js = fs.readFileSync(path.join(tmp, "extension", "dist", "extension.js"), "utf8");
-const shipped = JSON.parse(fs.readFileSync(path.join(tmp, "extension", "package.json"), "utf8"));
-const chat = fs.readFileSync(path.join(tmp, "extension", "media", "chat.js"), "utf8");
+const entries = readVsixText(fs.readFileSync(vsix), [
+  "extension/dist/extension.js",
+  "extension/package.json",
+  "extension/media/chat.js",
+]);
+const js = entries["extension/dist/extension.js"];
+const shipped = JSON.parse(entries["extension/package.json"]);
+const chat = entries["extension/media/chat.js"];
 
 const hostMissing = ["System.Speech", "StopFile", "writeTempAttach", "dropFileBytes"].filter(
   (m) => !js.includes(m),
