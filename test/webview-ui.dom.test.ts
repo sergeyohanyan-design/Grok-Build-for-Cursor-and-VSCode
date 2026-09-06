@@ -375,7 +375,10 @@ describe("new session welcome restore", () => {
     const welcome = $(doc, "welcome");
     expect((welcome as any).hidden).toBe(false);
     expect(welcome.classList.contains("welcome-dismissed")).toBe(false);
-    expect(doc.querySelector(".grok-mark-svg, .welcome-mark svg")).not.toBeNull();
+    const mark = doc.querySelector(".grok-mark-svg, .welcome-mark svg");
+    expect(mark).not.toBeNull();
+    expect(mark?.innerHTML).toContain("M17.05 7.35");
+    expect(mark?.innerHTML).not.toContain("M3.75 2.25");
     expect(doc.querySelector(".agent-pending")).toBeNull();
   });
 });

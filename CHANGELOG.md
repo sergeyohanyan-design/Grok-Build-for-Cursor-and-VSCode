@@ -2,11 +2,11 @@
 
 ## 1.0.7 — 2026-09-06
 
-> App icon: original Grok mark inside build brackets.
+> App icon: Grok Build G-mark (open G + spur).
 
 ### Changed
 
-- Marketplace, activity bar, and in-chat mark now use the original Grok glyph framed by construction brackets, with the mark large in the center.
+- Marketplace, activity bar, and in-chat mark use the G-mark that reads at 16px. The nested official Grok `</>` glyph looked like a generic code icon in the listing.
 
 ### Release
 

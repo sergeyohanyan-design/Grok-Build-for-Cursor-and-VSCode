@@ -157,7 +157,7 @@ html, body {
   shape-rendering: geometricPrecision;
 }
 
-/* Grok mark in build brackets — inline SVG inherits color (img tags cannot) */
+/* Grok Build mark — inline SVG inherits color (img tags cannot) */
 .grok-mark-wrap {
   display: inline-flex;
   align-items: center;

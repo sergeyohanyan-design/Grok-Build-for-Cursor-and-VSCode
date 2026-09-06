@@ -6,7 +6,7 @@ Grok Build for Cursor and VSCode (`SergeyOhanyan.grok-build`).
 
 ### Highlights
 
-- App icon: original Grok mark inside build brackets
+- App icon: Grok Build G-mark (open G + spur)
 - Slash commands (`/compact`, `/context`, `/imagine`, …) run as grok builtins
 - Chat auto-scroll only while you are at the bottom
 - Sidebar for the Grok Build CLI over the Agent Client Protocol
