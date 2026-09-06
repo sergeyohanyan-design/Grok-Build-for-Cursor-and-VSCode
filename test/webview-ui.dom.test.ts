@@ -377,7 +377,7 @@ describe("new session welcome restore", () => {
     expect(welcome.classList.contains("welcome-dismissed")).toBe(false);
     const mark = doc.querySelector(".grok-mark-svg, .welcome-mark svg");
     expect(mark).not.toBeNull();
-    expect(mark?.innerHTML).toContain("M17.05 7.35");
+    expect(mark?.innerHTML).toContain("M17.559 6.55");
     expect(mark?.innerHTML).not.toContain("M3.75 2.25");
     expect(doc.querySelector(".agent-pending")).toBeNull();
   });
