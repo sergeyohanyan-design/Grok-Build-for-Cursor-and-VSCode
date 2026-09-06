@@ -2,7 +2,7 @@
   "name": "grok-build",
   "displayName": "Grok Build for Cursor and VSCode",
   "description": "Grok Build sidebar for Cursor and VS Code: ACP host with Windows voice, chat copy/paste, screenshot vision, and file attach. Built for Cursor; also runs in VS Code. Not affiliated with xAI.",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "publisher": "SergeyOhanyan",
   "author": {
     "name": "Sergey Ohanyan"
@@ -291,7 +291,11 @@
         },
         "grok.voiceEngine": {
           "type": "string",
-          "enum": ["auto", "windows", "xai"],
+          "enum": [
+            "auto",
+            "windows",
+            "xai"
+          ],
           "default": "auto",
           "description": "Voice STT backend. auto = Windows System.Speech on Windows (no API key/ffmpeg), otherwise xAI cloud STT. windows = force System.Speech. xai = force xAI STT + ffmpeg."
         },

@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.8 — 2026-09-06
+
+> App icon: the real Grok black-hole mark, traced from the source art, in build brackets.
+
+### Changed
+
+- Marketplace, activity bar, and in-chat mark are now the actual xAI Grok mark instead of a freehand approximation. The glyph is not a ring with a slash through it: it is two interlocking curved shapes with a tapering spike, and the dark centre is open space rather than an enclosed hole. Redrawing it by eye kept losing that, so the contours are traced from the source art — marching squares on the greyscale at 0.5px tolerance, 173 points across four paths. The brackets stay; the glyph on its own is xAI's mark, the brackets are what make it Grok *Build*.
+
+### Known limit
+
+- The mark is 2.16:1, so inside a square icon box it can only be 24x11. It is crisp from about 36 device px up (any display scaling above 100%) and soft but still legible at exactly 24.
+
+### GitHub Releases VSIX
+
+- `grok-build-1.0.8.vsix`
+
 ## 1.0.7 — 2026-09-06
 
 > App icon: Grok Build G-mark (open G + spur).
