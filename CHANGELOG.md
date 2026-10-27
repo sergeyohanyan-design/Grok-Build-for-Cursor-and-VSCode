@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.9 — 2026-10-27
+
+> Long-running ACP prompts now stay connected while the agent is still producing protocol traffic.
+
+### Fixed
+
+- Replace the fixed 30-minute `session/prompt` wall-clock timeout with a 30-minute idle timeout that resets on valid ACP traffic.
+- Keep a separate 24-hour absolute safety cap so a continuously active but never-ending prompt still terminates.
+- Preserve the existing timeout behavior for initialization and other ACP requests.
+
+### GitHub Releases VSIX
+
+- `grok-build-1.0.9.vsix`
+
 ## 1.0.8 — 2026-09-06
 
 > App icon: the real Grok black-hole mark, traced from the source art, in build brackets.

@@ -24,6 +24,11 @@ import {
   shouldBlockWrite,
 } from "./plan-gate";
 import { resolveGrokHome } from "./sessions";
+import {
+  DEFAULT_PROMPT_ABSOLUTE_TIMEOUT_MS,
+  DEFAULT_PROMPT_IDLE_TIMEOUT_MS,
+  promptTimerDelayMs,
+} from "./acp-timeout";
 
 export type EffortLevel = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -113,7 +118,15 @@ export interface TerminalHandler {
   release(terminalId: string): void;
 }
 
-type Pending = { resolve: (v: any) => void; reject: (e: any) => void; timer?: ReturnType<typeof setTimeout> };
+type Pending = {
+  resolve: (v: any) => void;
+  reject: (e: any) => void;
+  timer?: ReturnType<typeof setTimeout>;
+  isPrompt?: boolean;
+  startedAt?: number;
+  lastActivityAt?: number;
+  armTimer?: () => void;
+};
 
 export function buildGrokAgentArgs(effort?: EffortLevel): string[] {
   // `--reasoning-effort` is an `agent`-level flag, so it must precede the `stdio`
@@ -371,27 +384,56 @@ export class AcpClient extends EventEmitter {
   private request(method: string, params: any): Promise<any> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      const entry: Pending = { resolve, reject };
+      const now = Date.now();
+      const entry: Pending = {
+        resolve,
+        reject,
+        isPrompt: method === "session/prompt",
+        startedAt: now,
+        lastActivityAt: now,
+      };
       this.pending.set(id, entry);
       if (!this.writeLine(makeRequest(id, method, params))) {
         this.pending.delete(id);
         reject(new Error(`Grok process is not running (${method})`));
         return;
       }
-      const timeoutMs = method === "session/prompt"
-        ? 1_800_000
-        : method === "initialize"
-          ? 45_000
-          : 90_000;
       // Tracked on the pending entry so the response/exit paths can clear it —
-      // otherwise every resolved request leaves a live timer (and its closure)
-      // armed for up to 30 min.
-      entry.timer = setTimeout(() => {
-        if (this.pending.delete(id)) {
-          reject(new Error(`ACP request timed out: ${method}`));
-        }
-      }, timeoutMs);
+      // otherwise every resolved request leaves a live timer. Prompts use an
+      // activity-aware idle timeout so a healthy long turn is not mistaken for
+      // a hung process, plus an independent absolute safety cap.
+      const armTimer = () => {
+        if (entry.timer) clearTimeout(entry.timer);
+        const waitMs = entry.isPrompt
+          ? promptTimerDelayMs({
+              startedAt: entry.startedAt ?? now,
+              lastActivityAt: entry.lastActivityAt ?? now,
+              now: Date.now(),
+              idleMs: DEFAULT_PROMPT_IDLE_TIMEOUT_MS,
+              absoluteMs: DEFAULT_PROMPT_ABSOLUTE_TIMEOUT_MS,
+            })
+          : method === "initialize"
+            ? 45_000
+            : 90_000;
+        entry.timer = setTimeout(() => {
+          if (this.pending.delete(id)) {
+            reject(new Error(`ACP request timed out: ${method}`));
+          }
+        }, waitMs);
+      };
+      entry.armTimer = armTimer;
+      armTimer();
     });
+  }
+
+  /** Any valid ACP traffic proves that an in-flight prompt is still alive. */
+  private touchPendingPromptTimers(): void {
+    const now = Date.now();
+    for (const pending of this.pending.values()) {
+      if (!pending.isPrompt || !pending.armTimer) continue;
+      pending.lastActivityAt = now;
+      pending.armTimer();
+    }
   }
 
   private respondOk(id: number | string, result: any = {}): void {
@@ -414,15 +456,20 @@ export class AcpClient extends EventEmitter {
       if (p) {
         this.pending.delete(ev.id as number);
         if (p.timer) clearTimeout(p.timer);
+        // Re-arm after removing this response so a prompt's own completion
+        // cannot leave a fresh timer behind.
+        this.touchPendingPromptTimers();
         if (ev.error) p.reject(ev.error);
         else p.resolve(ev.result);
       }
       return;
     }
     if (ev.kind === "session-update") {
+      this.touchPendingPromptTimers();
       this.handleSessionUpdate(ev.update);
       return;
     }
+    this.touchPendingPromptTimers();
     void this.handleServerRequest({ id: ev.id, method: ev.method, params: ev.params });
   }
 

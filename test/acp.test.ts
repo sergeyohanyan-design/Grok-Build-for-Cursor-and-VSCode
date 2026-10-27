@@ -32,6 +32,68 @@ describe("AcpClient.request timer lifecycle", () => {
       vi.useRealTimers();
     }
   });
+
+  it("keeps a long session/prompt alive while ACP updates continue", async () => {
+    vi.useFakeTimers();
+    try {
+      const { client } = clientWithFakeProc();
+      let settled = false;
+      const p = (client as any).request("session/prompt", { sessionId: "s", prompt: [] });
+      void p.then(() => { settled = true; }, () => { settled = true; });
+
+      await vi.advanceTimersByTimeAsync(1_700_000);
+      (client as any).onLine(JSON.stringify({
+        jsonrpc: "2.0",
+        method: "session/update",
+        params: { update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "still working" } } },
+      }));
+      await vi.advanceTimersByTimeAsync(200_000);
+      expect(settled).toBe(false);
+
+      (client as any).onLine(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { stopReason: "end_turn" } }));
+      await p;
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still times out a silent session/prompt", async () => {
+    vi.useFakeTimers();
+    try {
+      const { client } = clientWithFakeProc();
+      const p = (client as any).request("session/prompt", { sessionId: "s", prompt: [] });
+      const timedOut = expect(p).rejects.toThrow("ACP request timed out: session/prompt");
+      await vi.advanceTimersByTimeAsync(1_800_000);
+      await timedOut;
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the 24-hour absolute cap even when updates continue", async () => {
+    vi.useFakeTimers();
+    try {
+      const { client } = clientWithFakeProc();
+      const p = (client as any).request("session/prompt", { sessionId: "s", prompt: [] });
+      const timedOut = expect(p).rejects.toThrow("ACP request timed out: session/prompt");
+
+      for (let interval = 0; interval < 95; interval += 1) {
+        await vi.advanceTimersByTimeAsync(900_000);
+        (client as any).onLine(JSON.stringify({
+          jsonrpc: "2.0",
+          method: "session/update",
+          params: { update: { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "." } } },
+        }));
+      }
+      await vi.advanceTimersByTimeAsync(900_000);
+      await timedOut;
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 // #3/#4 (thanks @shugav for the crash report): the startup crash was the bogus
